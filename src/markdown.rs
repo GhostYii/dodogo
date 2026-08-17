@@ -126,8 +126,8 @@ fn sanitize(html: &str) -> String {
     let mut builder = Builder::default();
     builder.tags(tags);
     builder.link_rel(Some("noopener noreferrer"));
-    // a 标签属性
-    builder.add_tag_attributes("a", ["href", "title", "rel"]);
+    // a 标签属性（rel 由 link_rel 统一管理，勿重复添加）
+    builder.add_tag_attributes("a", ["href", "title"]);
     // img 标签属性
     builder.add_tag_attributes("img", ["src", "alt", "title"]);
     // 任务列表复选框
