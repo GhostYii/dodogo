@@ -1,0 +1,9 @@
+/target
+/data
+/web/static/assets
+/node_modules
+*.db
+*.db-wal
+*.db-shm
+.env
+.DS_Store

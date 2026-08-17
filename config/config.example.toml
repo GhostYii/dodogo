@@ -1,0 +1,44 @@
+# DoDoGo 配置示例（复制为 config.toml 使用）
+# 配置优先级：环境变量(DODOGO_*) > config.toml > 内置默认值
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+data_dir = "./data"
+
+[database]
+kind = "sqlite"
+url = ""   # 留空则使用 data_dir/dodogo.db
+
+[security]
+session_ttl_hours = 12
+remember_ttl_days = 30
+login_max_fail = 5
+login_lock_minutes = 15
+
+[upload]
+max_image_mb = 10
+max_file_mb = 100
+
+[gitlab]
+sync_interval_minutes = 5
+default_regex = "(?i)(?:#|{KEY}-)(\\d+)"
+
+[backup]
+enabled = true
+interval_days = 1
+keep = 7
+
+[smtp]
+enabled = false
+host = ""
+port = 587
+username = ""
+password = ""
+
+[log]
+level = "info"
+file = ""
+
+master_key_file = ""
