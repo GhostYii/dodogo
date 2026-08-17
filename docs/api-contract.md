@@ -3,6 +3,8 @@
 本文件是前端实现（Askama 模板 + web/ts + web/css）对接后端的唯一依据。
 前端代码只能放在 `web/` 与 `templates/` 下；SSR 处理器放在 `src/handlers/pages.rs`。
 
+> **字段命名约定（实际实现）**：**请求体/查询参数使用 snake_case**（如 `column_id`、`assignee_id`、`label_ids`、`base_url`、`main_repo`、`sync_interval_minutes`、`page_size`、`confirm_key`）；**响应 JSON 使用 camelCase**（如 `columnId`、`assigneeId`、`labelIds`）。下方示例为语义说明，字段以 snake_case 提交为准。
+
 ## 1. 通用约定
 
 - 基础路径 `/api`。JSON 响应统一：`{"code":0,"message":"ok","data":...}`；`code!=0` 为错误。

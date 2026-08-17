@@ -1,0 +1,13 @@
+{
+  "name": "dodogo-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DoDoGo 前端构建（esbuild 打包 TypeScript 与 CSS）",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0"
+  }
+}

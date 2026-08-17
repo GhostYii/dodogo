@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS projects (
     description     TEXT NOT NULL DEFAULT '',
     icon_color      TEXT NOT NULL DEFAULT '#3B82F6',
     owner_id        INTEGER NOT NULL REFERENCES users(id),
-    next_card_no    INTEGER NOT NULL DEFAULT 1,
+    next_card_no    INTEGER NOT NULL DEFAULT 0,
     status          TEXT NOT NULL DEFAULT 'active',     -- active | archived | deleted
     deleted_at      TEXT,
     created_at      TEXT NOT NULL,

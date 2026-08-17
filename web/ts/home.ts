@@ -1,0 +1,148 @@
+// 工作台：新建项目、我的任务汇总
+
+import { api, errMsg } from './api';
+import { el, qs, qsa, esc, avatar, initialsOf, fmtDate, timeAgo, formField } from './util';
+import { toast } from './toast';
+import { openModal, closeModal } from './modal';
+import { openCardDetail, priorityBadge } from './card-modal';
+import type { ProjectDto, BoardDto, BoardFull, CardSummary } from './types';
+
+const ICON_COLORS = ['#3B82F6', '#EF4444', '#F97316', '#EAB308', '#22C55E', '#06B6D4', '#8B5CF6', '#EC4899'];
+
+export function initHome(): void {
+  qs('#btn-new-project')?.addEventListener('click', openNewProjectModal);
+  void loadMyTasks();
+}
+
+// ============ 新建项目 ============
+
+function openNewProjectModal(): void {
+  const body = el('div', { class: 'form-stack' });
+
+  const keyInput = el('input', { class: 'input', type: 'text', placeholder: '如 DODG（2-6 位大写字母/数字）', maxlength: '6' });
+  body.append(formField('项目 Key', keyInput));
+
+  const nameInput = el('input', { class: 'input', type: 'text', placeholder: '如 DoDoGo 项目管理', maxlength: '60' });
+  body.append(formField('项目名称', nameInput));
+
+  const descInput = el('textarea', { class: 'input', rows: '3', placeholder: '一句话描述项目（可选）' });
+  body.append(formField('项目描述', descInput));
+
+  const colorWrap = el('div', { class: 'color-swatches' });
+  let selected = ICON_COLORS[0];
+  for (const c of ICON_COLORS) {
+    const sw = el('button', { class: 'swatch' + (c === selected ? ' active' : ''), type: 'button', style: `background:${c}` });
+    sw.addEventListener('click', () => {
+      selected = c;
+      qsa('.swatch', colorWrap).forEach((s) => s.classList.remove('active'));
+      sw.classList.add('active');
+    });
+    colorWrap.append(sw);
+  }
+  body.append(formField('图标颜色', colorWrap));
+
+  const tplSelect = el('select', { class: 'select' });
+  const tpls: [string, string][] = [
+    ['', '标准（待办 / 已完成）'],
+    ['dev', '开发流程（需求 / 开发 / 测试 / 发布）'],
+    ['todo', '任务清单（待办 / 进行中 / 已完成）'],
+  ];
+  for (const [v, t] of tpls) tplSelect.append(el('option', { value: v, text: t }));
+  body.append(formField('看板模板', tplSelect));
+
+  const foot = el('div', { class: 'modal-actions' });
+  const cancel = el('button', { class: 'btn btn-ghost', type: 'button', text: '取消' });
+  const ok = el('button', { class: 'btn btn-primary', type: 'button', text: '创建' });
+  cancel.addEventListener('click', () => closeModal());
+  ok.addEventListener('click', async () => {
+    const k = keyInput.value.trim().toUpperCase();
+    const n = nameInput.value.trim();
+    if (!/^[A-Z0-9]{2,6}$/.test(k)) {
+      toast('Key 需为 2-6 位大写字母或数字', 'error');
+      return;
+    }
+    if (!n) {
+      toast('请输入项目名称', 'error');
+      return;
+    }
+    ok.disabled = true;
+    try {
+      await api('/projects', {
+        method: 'POST',
+        body: {
+          key: k,
+          name: n,
+          description: descInput.value.trim(),
+          icon_color: selected,
+          template: tplSelect.value,
+        },
+      });
+      location.href = `/p/${k}`;
+    } catch (e) {
+      toast(errMsg(e), 'error');
+      ok.disabled = false;
+    }
+  });
+  foot.append(cancel, ok);
+  openModal({ title: '新建项目', body, footer: foot, width: '480px' });
+  keyInput.focus();
+}
+
+// ============ 我的任务 ============
+
+interface MyTask extends CardSummary {
+  projectKey: string;
+  projectName: string;
+  columnName?: string;
+}
+
+async function loadMyTasks(): Promise<void> {
+  const uid = Number(document.body.dataset.uid || 0);
+  const box = qs<HTMLElement>('#my-tasks');
+  const countEl = qs<HTMLElement>('#my-tasks-count');
+  if (!box) return;
+  box.innerHTML = '<div class="muted loading">加载中…</div>';
+  try {
+    const projects = await api<ProjectDto[]>('/projects');
+    const tasks: MyTask[] = [];
+    for (const p of projects) {
+      const boards = await api<BoardDto[]>(`/projects/${p.key}/boards`);
+      for (const b of boards) {
+        const full = await api<BoardFull>(`/boards/${b.id}`);
+        for (const c of full.cards) {
+          if (c.assignee && c.assignee.id === uid) {
+            const col = full.columns.find((x) => x.id === c.columnId);
+            tasks.push({ ...c, projectKey: p.key, projectName: p.name, columnName: col?.name });
+          }
+        }
+      }
+    }
+    tasks.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+    renderMyTasks(box, tasks.slice(0, 20));
+    if (countEl) countEl.textContent = tasks.length ? `共 ${tasks.length} 条` : '';
+  } catch {
+    box.innerHTML = '<div class="empty">加载失败</div>';
+  }
+}
+
+function renderMyTasks(box: HTMLElement, tasks: MyTask[]): void {
+  if (!tasks.length) {
+    box.innerHTML = '<div class="empty">暂无指派给你的任务</div>';
+    return;
+  }
+  box.innerHTML = '';
+  for (const t of tasks) {
+    const row = el('div', { class: 'task-row' });
+    const icon = el('span', { class: 'project-icon project-icon-sm', style: 'background:#3B82F6', text: initialsOf(t.projectKey) });
+    row.append(icon);
+    const main = el('div', { class: 'task-main' });
+    main.append(el('span', { class: 'task-title', text: t.title }));
+    main.append(el('span', { class: 'muted task-sub', text: `${t.number} · ${t.projectName}${t.columnName ? ' · ' + t.columnName : ''}` }));
+    row.append(main);
+    row.append(priorityBadge(t.priority));
+    if (t.dueDate) row.append(el('span', { class: 'card-due' + (t.dueDate < new Date().toISOString().slice(0, 10) ? ' overdue' : ''), text: fmtDate(t.dueDate) }));
+    row.append(el('span', { class: 'muted', text: timeAgo(t.updatedAt) }));
+    row.addEventListener('click', () => void openCardDetail(t.id));
+    box.append(row);
+  }
+}

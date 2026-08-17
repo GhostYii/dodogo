@@ -1,0 +1,5 @@
+/* DoDoGo 全局样式入口（esbuild 打包为 static/assets/app.css） */
+@import "./vars.css";
+@import "./layout.css";
+@import "./board.css";
+@import "./modal.css";

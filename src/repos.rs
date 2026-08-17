@@ -301,7 +301,7 @@ pub async fn create_project(
     let ts = now();
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO projects (key, name, description, icon_color, owner_id, next_card_no, status, created_at, updated_at) \
-         VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?) RETURNING id",
+         VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?) RETURNING id",
     )
     .bind(key)
     .bind(name)

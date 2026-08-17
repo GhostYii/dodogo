@@ -1,0 +1,182 @@
+/* ============ 弹窗与卡片详情 ============ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 25, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 20px;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.modal-title { margin: 0; font-size: 16px; }
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-2);
+  font-size: 14px;
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+}
+.modal-close:hover { background: var(--surface-2); color: var(--text); }
+
+.modal-body { padding: 16px; overflow-y: auto; }
+.modal-foot {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+.confirm-text { margin: 4px 0 8px; }
+.help-list { display: flex; flex-direction: column; gap: 10px; }
+.help-row { display: flex; align-items: center; gap: 12px; }
+
+/* ---- 卡片详情 ---- */
+.card-detail { display: flex; flex-direction: column; gap: 12px; }
+
+.cd-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cd-number { font-size: 13px; }
+.cd-updated { font-size: 12px; margin-left: auto; }
+
+.cd-grid { display: grid; grid-template-columns: 1fr 260px; gap: 20px; align-items: start; }
+@media (max-width: 820px) {
+  .cd-grid { grid-template-columns: 1fr; }
+}
+
+.cd-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+
+.cd-title-input {
+  width: 100%;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 600;
+  font-family: var(--font);
+  padding: 6px 8px;
+  border-radius: 6px;
+  outline: none;
+}
+.cd-title-input:hover { border-color: var(--border); }
+.cd-title-input:focus { border-color: var(--primary); background: var(--surface); }
+
+.cd-section { border-top: 1px solid var(--border); padding-top: 14px; }
+.cd-section-title {
+  font-size: 13px;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+.cd-desc-view { cursor: pointer; border-radius: 6px; padding: 8px; }
+.cd-desc-view:hover { background: var(--surface-2); }
+.cd-desc-editor { display: flex; flex-direction: column; gap: 8px; }
+.editor-tabs { display: flex; gap: 4px; }
+.cd-desc-preview { border: 1px solid var(--border); border-radius: 6px; padding: 10px; min-height: 80px; }
+
+/* 侧栏 */
+.cd-sidebar { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; background: var(--bg); }
+.cd-sidebar .field { margin-bottom: 12px; }
+.cd-ops { display: flex; flex-direction: column; gap: 6px; }
+
+.label-picker { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow-y: auto; }
+.label-picker .btn { align-self: flex-start; margin-top: 6px; }
+.label-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+/* 清单 */
+.checklist-progress { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.checklist { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; }
+.checklist-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.checklist-title { font-weight: 600; }
+.checklist-items { display: flex; flex-direction: column; gap: 2px; }
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.checklist-item:hover { background: var(--surface-2); }
+.checklist-item.done span { text-decoration: line-through; color: var(--text-2); }
+.checklist-item .btn-icon { margin-left: auto; opacity: 0; }
+.checklist-item:hover .btn-icon { opacity: 1; }
+.add-inline { margin: 6px 0 2px; }
+
+/* 评论 */
+.comment-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+.comment { display: flex; gap: 10px; }
+.comment-main { flex: 1; min-width: 0; }
+.comment-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.comment-author { font-weight: 600; }
+.comment-main .markdown-body {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.comment-editor { display: flex; flex-direction: column; gap: 6px; }
+
+/* 附件 */
+.attach-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.attach-row { display: flex; align-items: center; gap: 10px; }
+.attach-name { font-weight: 500; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach-row .btn-icon { margin-left: auto; }
+
+/* Git */
+.git-list { display: flex; flex-direction: column; gap: 6px; }
+.git-row { display: flex; align-items: center; gap: 10px; }
+.git-sha {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.git-msg { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.git-mr {
+  font-size: 12px;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  border-radius: 4px;
+  padding: 0 6px;
+}
+
+/* 活动 */
+.activity-list { display: flex; flex-direction: column; gap: 8px; }
+.activity-row { display: flex; align-items: center; gap: 8px; }
+.activity-who { font-weight: 600; }
+.activity-detail { color: var(--text-2); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 个人设置 */
+.profile-avatar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
