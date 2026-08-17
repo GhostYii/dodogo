@@ -1,19 +1,26 @@
 //! 路由装配
 
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
+use axum::http::header::{CACHE_CONTROL, CONTENT_TYPE};
+use axum::http::{HeaderValue, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Json};
 use axum::routing::get;
 use axum::Router;
+use rust_embed::RustEmbed;
 use serde::Deserialize;
 use serde_json::json;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 
-use crate::error::AppError;
-use crate::middleware::{RequireAuth, SESSION_COOKIE};
+use crate::middleware::RequireAuth;
 use crate::response::ok;
 use crate::state::AppState;
+
+/// 前端静态资源（编译期嵌入二进制，实现单文件可移植部署）。
+#[derive(RustEmbed)]
+#[folder = "web/static/"]
+struct StaticAssets;
 
 pub fn build(state: AppState) -> Router {
     let api = Router::new()
@@ -26,8 +33,6 @@ pub fn build(state: AppState) -> Router {
         .route("/stream", get(stream))
         .route("/markdown/preview", axum::routing::post(markdown_preview));
 
-    let static_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/web/static");
-
     Router::new()
         .route("/healthz", get(health))
         .route("/api/system/status", get(system_status))
@@ -38,7 +43,7 @@ pub fn build(state: AppState) -> Router {
         .nest("/api/admin", crate::handlers::admin::routes())
         .nest("/api", api)
         .merge(crate::handlers::pages::routes())
-        .nest_service("/static", tower_http::services::ServeDir::new(static_dir))
+        .route("/static/{*path}", get(static_asset))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::csrf_mw,
@@ -69,6 +74,23 @@ async fn system_status(State(state): State<AppState>) -> impl IntoResponse {
         "db": if db_ok { "ok" } else { "error" },
         "startedAt": state.started_at,
     }))
+}
+
+/// 从嵌入的静态资源提供文件。
+async fn static_asset(Path(path): Path<String>) -> impl IntoResponse {
+    match StaticAssets::get(path.trim_start_matches('/')) {
+        Some(content) => {
+            let mime = mime_guess::from_path(&path).first_or_octet_stream();
+            let mut resp = content.data.into_response();
+            let headers = resp.headers_mut();
+            if let Ok(v) = HeaderValue::from_str(mime.as_ref()) {
+                headers.insert(CONTENT_TYPE, v);
+            }
+            headers.insert(CACHE_CONTROL, HeaderValue::from_static("public, max-age=3600"));
+            resp
+        }
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 #[derive(Deserialize)]
@@ -105,11 +127,4 @@ pub struct MarkdownReq {
 async fn markdown_preview(Json(req): Json<MarkdownReq>) -> impl IntoResponse {
     let html = crate::markdown::render(&req.text);
     ok(json!({ "html": html }))
-}
-
-// 保留引用，确保编译期检查 SESSION_COOKIE 常量存在
-#[allow(dead_code)]
-fn _touch() {
-    let _ = SESSION_COOKIE;
-    let _ = AppError::NotFound;
 }

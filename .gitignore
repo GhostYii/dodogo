@@ -1,5 +1,6 @@
 /target
 /data
+/release
 node_modules/
 *.db
 *.db-wal
