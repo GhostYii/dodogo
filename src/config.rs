@@ -159,13 +159,12 @@ impl Config {
     /// 加载配置：读取可选 config.toml，再用环境变量覆盖。
     pub fn load(path: Option<&Path>) -> anyhow::Result<Self> {
         let mut cfg = Config::default();
-        if let Some(p) = path {
-            if p.exists() {
+        if let Some(p) = path
+            && p.exists() {
                 let text = std::fs::read_to_string(p)?;
                 let file_cfg: Config = toml::from_str(&text)?;
                 cfg = file_cfg;
             }
-        }
         cfg.apply_env();
         Ok(cfg)
     }
@@ -178,18 +177,16 @@ impl Config {
             }
         }
         fn set_u16(target: &mut u16, name: &str) {
-            if let Ok(v) = env::var(format!("DODOGO_{name}")) {
-                if let Ok(n) = v.parse() {
+            if let Ok(v) = env::var(format!("DODOGO_{name}"))
+                && let Ok(n) = v.parse() {
                     *target = n;
                 }
-            }
         }
         fn set_usize(target: &mut usize, name: &str) {
-            if let Ok(v) = env::var(format!("DODOGO_{name}")) {
-                if let Ok(n) = v.parse() {
+            if let Ok(v) = env::var(format!("DODOGO_{name}"))
+                && let Ok(n) = v.parse() {
                     *target = n;
                 }
-            }
         }
         set_str(&mut self.server.host, "SERVER_HOST");
         set_u16(&mut self.server.port, "SERVER_PORT");

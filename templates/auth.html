@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <span class="auth-logo">D</span>
+      <h1 class="auth-title">{% block auth_title %}DoDoGo{% endblock %}</h1>
+      <p class="auth-sub">{% block auth_sub %}{% endblock %}</p>
+    </div>
+    {% block auth_form %}{% endblock %}
+    <p class="auth-foot">DoDoGo · 简约项目管理</p>
+  </div>
+</div>
+{% endblock %}

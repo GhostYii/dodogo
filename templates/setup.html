@@ -1,0 +1,31 @@
+{% extends "auth.html" %}
+{% block title %}初始化 - DoDoGo{% endblock %}
+{% block body_attrs %}data-page="setup"{% endblock %}
+{% block auth_title %}初始化向导{% endblock %}
+{% block auth_sub %}系统当前还没有任何账号，注册的首个账号将自动成为系统管理员{% endblock %}
+{% block auth_form %}
+<form id="auth-form" class="auth-form" novalidate>
+  <div class="field">
+    <label for="setup-username">管理员用户名</label>
+    <input id="setup-username" name="username" type="text" class="input" required autocomplete="username" autofocus placeholder="如 admin">
+  </div>
+  <div class="field">
+    <label for="setup-displayname">昵称（可选）</label>
+    <input id="setup-displayname" name="displayName" type="text" class="input" autocomplete="nickname" placeholder="如 系统管理员">
+  </div>
+  <div class="field">
+    <label for="setup-email">邮箱（可选）</label>
+    <input id="setup-email" name="email" type="email" class="input" autocomplete="email" placeholder="name@example.com">
+  </div>
+  <div class="field">
+    <label for="setup-password">密码（8-64 位，需含字母和数字）</label>
+    <input id="setup-password" name="password" type="password" class="input" required autocomplete="new-password" placeholder="请输入密码">
+  </div>
+  <div class="field">
+    <label for="setup-confirm">确认密码</label>
+    <input id="setup-confirm" name="confirm" type="password" class="input" required autocomplete="new-password" placeholder="再次输入密码">
+  </div>
+  <button class="btn btn-primary btn-block" type="submit">创建管理员账号</button>
+  <p id="auth-error" class="auth-error" hidden></p>
+</form>
+{% endblock %}

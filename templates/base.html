@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="{{ csrf }}">
+<title>{% block title %}DoDoGo{% endblock %}</title>
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('dodogo-theme');
+    if (t !== 'light' && t !== 'dark') {
+      t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+})();
+</script>
+<link rel="stylesheet" href="/static/assets/app.css">
+{% block head %}{% endblock %}
+</head>
+<body {% block body_attrs %}{% endblock %}>
+{% block body %}{% endblock %}
+<div id="toasts" class="toasts"></div>
+<script src="/static/assets/app.js" defer></script>
+</body>
+</html>

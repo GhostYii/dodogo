@@ -36,11 +36,10 @@ async fn main() -> anyhow::Result<()> {
 
 fn parse_config_path() -> Option<PathBuf> {
     let args: Vec<String> = std::env::args().collect();
-    if let Some(pos) = args.iter().position(|a| a == "--config" || a == "-c") {
-        if let Some(v) = args.get(pos + 1) {
+    if let Some(pos) = args.iter().position(|a| a == "--config" || a == "-c")
+        && let Some(v) = args.get(pos + 1) {
             return Some(PathBuf::from(v));
         }
-    }
     Some(PathBuf::from("config/config.toml"))
 }
 
@@ -91,11 +90,10 @@ async fn sync_gitlab_projects(state: &AppState) {
         let due = cfg.last_sync_at.map(|t| {
             chrono::Utc::now() - t > chrono::Duration::minutes(cfg.sync_interval_minutes.max(1))
         });
-        if due.unwrap_or(true) {
-            if let Err(e) = dodogo::gitlab::sync_project(state, project.id).await {
+        if due.unwrap_or(true)
+            && let Err(e) = dodogo::gitlab::sync_project(state, project.id).await {
                 let _ = dodogo::repos::update_gitlab_sync_status(&state.pool, project.id, &e.code().to_string(), &e.to_string()).await;
             }
-        }
     }
 }
 

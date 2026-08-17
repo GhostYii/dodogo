@@ -1,0 +1,9 @@
+{% extends "project_layout.html" %}
+{% block title %}里程碑 - {{ nav.name }} - DoDoGo{% endblock %}
+{% block project_content %}
+<div class="section-bar">
+  <h3>里程碑</h3>
+  <button class="btn btn-primary btn-sm" id="btn-add-milestone" type="button">+ 新建里程碑</button>
+</div>
+<div id="milestones-list" class="meta-list"></div>
+{% endblock %}

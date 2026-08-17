@@ -1,0 +1,32 @@
+{% extends "auth.html" %}
+{% block title %}注册 - DoDoGo{% endblock %}
+{% block body_attrs %}data-page="register"{% endblock %}
+{% block auth_title %}注册{% endblock %}
+{% block auth_sub %}创建账号，开始你的项目管理{% endblock %}
+{% block auth_form %}
+<form id="auth-form" class="auth-form" novalidate>
+  <div class="field">
+    <label for="reg-username">用户名（3-32 位，字母/数字/下划线/连字符）</label>
+    <input id="reg-username" name="username" type="text" class="input" required autocomplete="username" autofocus placeholder="如 alice">
+  </div>
+  <div class="field">
+    <label for="reg-displayname">昵称（可选）</label>
+    <input id="reg-displayname" name="displayName" type="text" class="input" autocomplete="nickname" placeholder="如 小明">
+  </div>
+  <div class="field">
+    <label for="reg-email">邮箱（可选）</label>
+    <input id="reg-email" name="email" type="email" class="input" autocomplete="email" placeholder="name@example.com">
+  </div>
+  <div class="field">
+    <label for="reg-password">密码（8-64 位，需含字母和数字）</label>
+    <input id="reg-password" name="password" type="password" class="input" required autocomplete="new-password" placeholder="请输入密码">
+  </div>
+  <div class="field">
+    <label for="reg-confirm">确认密码</label>
+    <input id="reg-confirm" name="confirm" type="password" class="input" required autocomplete="new-password" placeholder="再次输入密码">
+  </div>
+  <button class="btn btn-primary btn-block" type="submit">注 册</button>
+  <p id="auth-error" class="auth-error" hidden></p>
+  <p class="auth-alt">已有账号？<a href="/login">直接登录</a></p>
+</form>
+{% endblock %}

@@ -34,14 +34,12 @@ pub struct RateLimitConfig {
 
 pub fn check_locked(identity: &str, cfg: &RateLimitConfig) -> AppResult<()> {
     let map = attempts().lock().unwrap();
-    if let Some(st) = map.get(&identity.to_lowercase()) {
-        if let Some(until) = st.lock_until {
-            if until > Instant::now() {
+    if let Some(st) = map.get(&identity.to_lowercase())
+        && let Some(until) = st.lock_until
+            && until > Instant::now() {
                 let left = until.duration_since(Instant::now()).as_secs();
                 return Err(AppError::Business(format!("账号已临时锁定，请 {left} 秒后重试")));
             }
-        }
-    }
     let _ = cfg;
     Ok(())
 }
@@ -69,6 +67,7 @@ pub struct AuthOutput {
     pub jar: CookieJar,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn login(
     pool: &SqlitePool,
     identity: &str,

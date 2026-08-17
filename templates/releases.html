@@ -1,0 +1,9 @@
+{% extends "project_layout.html" %}
+{% block title %}版本 - {{ nav.name }} - DoDoGo{% endblock %}
+{% block project_content %}
+<div class="section-bar">
+  <h3>版本</h3>
+  <button class="btn btn-primary btn-sm" id="btn-add-release" type="button">+ 新建版本</button>
+</div>
+<div id="releases-list" class="meta-list"></div>
+{% endblock %}

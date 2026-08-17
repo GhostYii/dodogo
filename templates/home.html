@@ -1,0 +1,43 @@
+{% extends "app.html" %}
+{% block title %}工作台 - DoDoGo{% endblock %}
+{% block content %}
+<div class="home-head">
+  <div>
+    <h2>工作台</h2>
+    <p class="muted">欢迎回来，{{ user.display_name }}</p>
+  </div>
+  <button class="btn btn-primary" id="btn-new-project" type="button">+ 新建项目</button>
+</div>
+
+<section class="card home-section">
+  <div class="section-head">
+    <h3>我的任务</h3>
+    <span class="muted" id="my-tasks-count"></span>
+  </div>
+  <div id="my-tasks" class="task-list"></div>
+</section>
+
+<section class="card home-section">
+  <div class="section-head">
+    <h3>我的项目</h3>
+  </div>
+  {% if has_projects %}
+  <div class="project-grid">
+    {% for p in projects %}
+    <a class="project-card" href="/p/{{ p.key }}">
+      <span class="project-icon" style="background-color: {{ p.icon_color }}">{{ p.initials }}</span>
+      <div class="project-card-meta">
+        <span class="project-card-name">{{ p.name }}</span>
+        <span class="project-card-sub">{{ p.key }} · {{ p.role_label }}</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>还没有项目</p>
+    <p class="muted">点击右上角「新建项目」创建第一个项目。</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

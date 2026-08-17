@@ -1,0 +1,10 @@
+{% extends "project_layout.html" %}
+{% block title %}项目设置 - {{ nav.name }} - DoDoGo{% endblock %}
+{% block project_content %}
+<div class="settings-tabs">
+  <button class="tab-btn active" data-tab="basic" type="button">基本信息</button>
+  <button class="tab-btn" data-tab="gitlab" type="button">GitLab 集成</button>
+</div>
+<div id="settings-basic" class="tab-pane"></div>
+<div id="settings-gitlab" class="tab-pane" hidden></div>
+{% endblock %}

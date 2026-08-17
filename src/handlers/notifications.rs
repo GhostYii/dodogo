@@ -69,7 +69,7 @@ async fn read_all(State(state): State<AppState>, user: RequireAuth) -> AppResult
 
 async fn get_preferences(State(state): State<AppState>, user: RequireAuth) -> AppResult<impl IntoResponse> {
     let key = format!("notify_prefs:{}", user.0.id);
-    let raw = repos::get_setting(&state.pool, &key).await?.unwrap_or_else(|| default_prefs());
+    let raw = repos::get_setting(&state.pool, &key).await?.unwrap_or_else(default_prefs);
     let prefs: serde_json::Value = serde_json::from_str(&raw).unwrap_or_else(|_| serde_json::from_str(&default_prefs()).unwrap());
     Ok(ok(prefs))
 }

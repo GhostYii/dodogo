@@ -108,7 +108,7 @@ async fn get_settings(State(state): State<AppState>, _admin: RequireAdmin) -> Ap
     let map: serde_json::Map<String, serde_json::Value> = rows
         .into_iter()
         .map(|(k, v)| {
-            let parsed = serde_json::from_str::<serde_json::Value>(&v).unwrap_or_else(|_| serde_json::Value::String(v));
+            let parsed = serde_json::from_str::<serde_json::Value>(&v).unwrap_or(serde_json::Value::String(v));
             (k, parsed)
         })
         .collect();
@@ -193,8 +193,8 @@ async fn list_backups(State(state): State<AppState>, _admin: RequireAdmin) -> Ap
     let mut items = Vec::new();
     if let Ok(mut entries) = tokio::fs::read_dir(state.config.backups_dir()).await {
         while let Ok(Some(entry)) = entries.next_entry().await {
-            if let Ok(meta) = entry.metadata().await {
-                if meta.is_file() {
+            if let Ok(meta) = entry.metadata().await
+                && meta.is_file() {
                     items.push(json!({
                         "name": entry.file_name().to_string_lossy(),
                         "size": meta.len(),
@@ -203,7 +203,6 @@ async fn list_backups(State(state): State<AppState>, _admin: RequireAdmin) -> Ap
                         }),
                     }));
                 }
-            }
         }
     }
     items.sort_by(|a, b| b["modifiedAt"].to_string().cmp(&a["modifiedAt"].to_string()));

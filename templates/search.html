@@ -1,0 +1,11 @@
+{% extends "app.html" %}
+{% block title %}搜索 - DoDoGo{% endblock %}
+{% block content %}
+<div class="search-page">
+  <div class="search-page-head">
+    <h2>全局搜索</h2>
+    <input id="search-input" class="input search-page-input" type="text" placeholder="输入关键字或单号（如 DODG-12、#12）" autofocus autocomplete="off">
+  </div>
+  <div id="search-results" class="search-results"></div>
+</div>
+{% endblock %}

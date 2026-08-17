@@ -1,0 +1,13 @@
+{% extends "app.html" %}
+{% block title %}管理后台 - DoDoGo{% endblock %}
+{% block content %}
+<div class="admin-layout">
+  <nav class="admin-nav">
+    <a href="/admin" class="{% if is_overview %}active{% endif %}">概览</a>
+    <a href="/admin/users" class="{% if is_users %}active{% endif %}">用户管理</a>
+    <a href="/admin/settings" class="{% if is_settings %}active{% endif %}">系统设置</a>
+    <a href="/admin/audit" class="{% if is_audit %}active{% endif %}">审计日志</a>
+  </nav>
+  <div class="admin-content" id="admin-content" data-section="{{ section }}"></div>
+</div>
+{% endblock %}

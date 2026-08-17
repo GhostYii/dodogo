@@ -1,0 +1,21 @@
+{% extends "app.html" %}
+{% block body_attrs %}data-page="{{ page }}" data-uid="{{ user.id }}" data-username="{{ user.username }}" data-project-key="{{ nav.key }}"{% endblock %}
+{% block content %}
+<div class="project-head">
+  <div class="project-head-main">
+    <span class="project-icon project-icon-lg" style="background-color: {{ nav.icon_color }}">{{ nav.initials }}</span>
+    <div>
+      <h2 class="project-title">{{ nav.name }}</h2>
+      <span class="muted">{{ nav.key }} · {{ nav.role_label }}</span>
+    </div>
+  </div>
+  <nav class="project-nav">
+    <a href="/p/{{ nav.key }}/board/{{ nav.default_board_id }}" class="{% if nav.nav_board %}active{% endif %}">看板</a>
+    <a href="/p/{{ nav.key }}/milestones" class="{% if nav.nav_milestones %}active{% endif %}">里程碑</a>
+    <a href="/p/{{ nav.key }}/releases" class="{% if nav.nav_releases %}active{% endif %}">版本</a>
+    <a href="/p/{{ nav.key }}/members" class="{% if nav.nav_members %}active{% endif %}">成员</a>
+    <a href="/p/{{ nav.key }}/settings" class="{% if nav.nav_settings %}active{% endif %}">设置</a>
+  </nav>
+</div>
+{% block project_content %}{% endblock %}
+{% endblock %}

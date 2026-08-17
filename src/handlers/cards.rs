@@ -73,13 +73,11 @@ async fn create_card(State(state): State<AppState>, user: RequireAuth, Path(colu
 
     // 套用卡片模板（可选）
     let mut description = req.description.unwrap_or_default();
-    if let Some(tid) = req.template_id {
-        if let Some(tpl) = load_template(&state, tid).await {
-            if description.is_empty() {
+    if let Some(tid) = req.template_id
+        && let Some(tpl) = load_template(&state, tid).await
+            && description.is_empty() {
                 description = tpl.description;
             }
-        }
-    }
 
     let no = repos::next_card_no(&state.pool, project.id).await?;
     let cards = repos::list_cards_by_column(&state.pool, column_id).await?;
@@ -108,11 +106,10 @@ async fn create_card(State(state): State<AppState>, user: RequireAuth, Path(colu
     .await?;
 
     services::log_activity(&state, project.id, id, &user.0, "created", &format!("创建卡片 {}-{}", project.key, no)).await.ok();
-    if let Some(aid) = req.assignee_id {
-        if aid != user.0.id {
+    if let Some(aid) = req.assignee_id
+        && aid != user.0.id {
             services::notify(&state, aid, "assigned", "你被指派了新任务", &format!("{}-{} {}", project.key, no, title), &format!("/p/{}/card/{}", project.key, id)).await.ok();
         }
-    }
     let card = repos::get_card(&state.pool, id).await?.ok_or(AppError::NotFound)?;
     state.broadcast(&format!("board:{}", board.id), "card.created", json!({ "cardId": id, "boardId": board.id, "columnId": column_id }));
     Ok(ok(json!({ "id": card.id, "no": card.no, "number": card.number(&project.key), "role": role })))
@@ -360,11 +357,10 @@ async fn patch_card(State(state): State<AppState>, user: RequireAuth, Path(id): 
     repos::patch_card(&state.pool, id, &patch, user.0.id).await?;
 
     // 指派变更通知
-    if let Some(Some(new_assignee)) = patch.assignee_id {
-        if Some(new_assignee) != card.assignee_id && new_assignee != user.0.id {
+    if let Some(Some(new_assignee)) = patch.assignee_id
+        && Some(new_assignee) != card.assignee_id && new_assignee != user.0.id {
             services::notify(&state, new_assignee, "assigned", "你被指派了新任务", &format!("{}-{} {}", project.key, card.no, card.title), &format!("/p/{}/card/{}", project.key, id)).await.ok();
         }
-    }
 
     let changes = describe_changes(&patch);
     services::log_activity(&state, project.id, id, &user.0, "updated", &format!("更新了卡片：{}", changes)).await.ok();
@@ -419,9 +415,8 @@ async fn move_card(State(state): State<AppState>, user: RequireAuth, Path(id): P
     let mut tx = state.pool.begin().await?;
     for (i, cid) in target_cards.iter().enumerate() {
         let pos = ((i + 1) as i64) * 1024;
-        let col = if *cid == id { req.column_id } else { req.column_id };
         sqlx::query("UPDATE cards SET column_id = ?, position = ?, updated_by = ?, updated_at = ? WHERE id = ?")
-            .bind(col)
+            .bind(req.column_id)
             .bind(pos)
             .bind(user.0.id)
             .bind(chrono::Utc::now())

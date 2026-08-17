@@ -1,0 +1,9 @@
+{% extends "project_layout.html" %}
+{% block title %}成员 - {{ nav.name }} - DoDoGo{% endblock %}
+{% block project_content %}
+<div class="section-bar">
+  <h3>项目成员</h3>
+  <button class="btn btn-primary btn-sm" id="btn-add-member" type="button">+ 添加成员</button>
+</div>
+<div id="members-list" class="card"></div>
+{% endblock %}

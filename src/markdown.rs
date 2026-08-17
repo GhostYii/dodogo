@@ -55,7 +55,7 @@ fn render_card_refs(text: &str) -> String {
             rest = &after[end + 2..];
         } else {
             result.push_str("[[]]");
-            rest = &after;
+            rest = after;
         }
     }
     result.push_str(rest);

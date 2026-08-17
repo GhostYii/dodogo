@@ -1,0 +1,24 @@
+{% extends "project_layout.html" %}
+{% block title %}{{ nav.name }} 看板 - DoDoGo{% endblock %}
+{% block project_content %}
+<div class="board-toolbar">
+  <div class="board-switch">
+    <select id="board-select" class="select select-sm">
+      {% for b in boards %}
+      <option value="{{ b.id }}" {% if b.id == board_id %}selected{% endif %}>{{ b.name }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-ghost btn-sm" id="btn-new-board" type="button">+ 新建看板</button>
+  </div>
+  <div class="board-filters">
+    <input id="filter-q" class="input input-sm" type="text" placeholder="关键字…">
+    <select id="filter-assignee" class="select select-sm"><option value="">全部成员</option></select>
+    <select id="filter-label" class="select select-sm"><option value="">全部标签</option></select>
+    <select id="filter-priority" class="select select-sm"><option value="">全部优先级</option></select>
+    <button class="btn btn-ghost btn-sm" id="btn-filter-reset" type="button">重置</button>
+  </div>
+</div>
+<div class="board-scroll" id="board-scroll">
+  <div class="board" id="board" data-board-id="{{ board_id }}" data-project-key="{{ nav.key }}"></div>
+</div>
+{% endblock %}

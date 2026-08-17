@@ -29,10 +29,10 @@ async fn search(State(state): State<AppState>, user: RequireAuth, Query(q): Quer
     // 单号精确匹配优先：形如 `DODG-12` 或 `#12`
     let mut exact: Option<serde_json::Value> = None;
     let cleaned = q.trim_start_matches('#');
-    if let Some((key, no)) = cleaned.rsplit_once('-') {
-        if let Ok(no) = no.parse::<i64>() {
-            if let Some(project) = repos::get_project_by_key(&state.pool, key).await? {
-                if let Ok(Some(card)) = repos::get_card_by_no(&state.pool, project.id, no).await {
+    if let Some((key, no)) = cleaned.rsplit_once('-')
+        && let Ok(no) = no.parse::<i64>()
+            && let Some(project) = repos::get_project_by_key(&state.pool, key).await?
+                && let Ok(Some(card)) = repos::get_card_by_no(&state.pool, project.id, no).await {
                     exact = Some(json!({
                         "id": card.id,
                         "no": card.no,
@@ -42,9 +42,6 @@ async fn search(State(state): State<AppState>, user: RequireAuth, Query(q): Quer
                         "projectName": project.name,
                     }));
                 }
-            }
-        }
-    }
 
     let rows = repos::search_cards(&state.pool, user.0.id, &q).await?;
     let mut items: Vec<serde_json::Value> = rows
