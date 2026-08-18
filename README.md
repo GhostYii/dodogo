@@ -51,8 +51,9 @@ source/
 │   └── routes.rs          # 路由装配 + SSE + 健康检查
 ├── templates/             # Askama 模板
 ├── web/                   # 前端 TS/CSS 源码 + 构建产物
+├── desktop/               # 桌面客户端壳（wry + tao WebView，自动拉起服务）
 ├── config/config.example.toml
-├── scripts/               # 构建/安装脚本
+├── scripts/               # 构建/安装/release 打包脚本
 ├── docker/Dockerfile
 └── docs/api-contract.md   # 前端集成契约
 ```
@@ -63,8 +64,21 @@ source/
 
 - Rust stable（1.85+，建议 1.97）
 - Node.js 20+（仅前端构建需要）
+- 桌面客户端另需 Windows 10/11（内置 WebView2）
 
-### 构建与运行
+### 方式一：桌面客户端（套壳版）
+
+```bash
+# 构建服务端 + 桌面客户端
+cargo build --release
+cargo build --release -p dodogo-desktop
+# 运行桌面客户端（会自动拉起服务并打开应用窗口）
+./target/release/dodogo-desktop.exe
+```
+
+桌面客户端 `dodogo-desktop.exe` 使用系统 WebView2 呈现界面：启动时自动查找同目录下的 `dodogo.exe` 并拉起服务（等待就绪后打开窗口），关闭窗口即停止服务。发布包中两者同目录，直接双击 `dodogo-desktop.exe` 即可。
+
+### 方式二：网页部署版
 
 ```bash
 # 1. 构建前端静态资源
@@ -77,7 +91,17 @@ cd ..
 cargo run
 ```
 
-启动后访问 `http://127.0.0.1:8080`，首次启动进入初始化向导创建管理员账号。
+启动后浏览器访问 `http://127.0.0.1:8080`。
+
+### 管理员账号注册方式
+
+DoDoGo 采用「**首个注册账号自动成为系统管理员**」的策略：
+
+1. 首次启动后，打开登录页点击「注册」（或直接访问 `/setup` 初始化向导）；
+2. 填写用户名（3-32 字符）、密码（8-64 位，含字母与数字）、可选邮箱；
+3. 注册成功的**第一个账号**即为系统管理员（`system_admin`），可访问 `/admin` 管理后台（用户管理、系统设置、审计日志、备份恢复）。
+
+后续注册的账号为普通用户。管理员可在管理后台 → 用户管理中将任意用户改为系统管理员；若需关闭公开注册，可在管理后台 → 系统设置中将 `allow_registration` 设为 `0`（此时仅管理员可创建用户）。
 
 ### 健康检查
 
