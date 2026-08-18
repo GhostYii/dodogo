@@ -69,12 +69,27 @@ async fn upload_attachment(
             let ext = file_name.rsplit('.').next().unwrap_or("bin").to_lowercase();
             let safe_ext: String = ext.chars().filter(|c| c.is_alphanumeric()).take(10).collect();
             let hash = crate::crypto::sha256_hex(&String::from_utf8_lossy(&data));
-            let rel = format!("uploads/{}/{}.{}", chrono::Utc::now().format("%Y%m"), &hash[..40], safe_ext);
+            // 以内容哈希命名（无日期前缀），同一份内容始终映射到同一路径，磁盘全局去重
+            let rel = format!("uploads/{}.{}", hash, safe_ext);
+            // 数据库去重：同一卡片内已存在相同内容则复用，不再建副本
+            if let Some(existing) = sqlx::query_as::<_, crate::models::Attachment>(
+                "SELECT * FROM attachments WHERE card_id = ? AND file_path = ? LIMIT 1",
+            )
+            .bind(id)
+            .bind(&rel)
+            .fetch_optional(&state.pool)
+            .await?
+            {
+                return Ok(ok(json!({ "id": existing.id, "fileName": existing.file_name, "fileSize": existing.file_size, "dedup": true })));
+            }
             let abs = state.config.uploads_dir().join(&rel);
             if let Some(parent) = abs.parent() {
                 tokio::fs::create_dir_all(parent).await.map_err(|e| AppError::Internal(e.into()))?;
             }
-            tokio::fs::write(&abs, &data).await.map_err(|e| AppError::Internal(e.into()))?;
+            // 磁盘去重：文件已存在则跳过写入
+            if !tokio::fs::metadata(&abs).await.is_ok() {
+                tokio::fs::write(&abs, &data).await.map_err(|e| AppError::Internal(e.into()))?;
+            }
             let aid = repos::create_attachment(&state.pool, id, &file_name, &rel, data.len() as i64, &content_type, user.0.id).await?;
             return Ok(ok(json!({ "id": aid, "fileName": file_name, "fileSize": data.len() })));
         }
