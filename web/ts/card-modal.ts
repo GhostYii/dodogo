@@ -146,16 +146,22 @@ function buildDescription(d: CardDetail): HTMLElement {
   view.addEventListener('click', () => showEditor());
 
   const editor = el('div', { class: 'cd-desc-editor', hidden: 'true' });
-  const ta = el('textarea', { class: 'input', rows: '8', placeholder: '支持 Markdown…' });
-  ta.value = d.description || '';
 
-  // 实时预览：输入即渲染（防抖调用后端 Markdown 渲染），无需预览按钮
-  const preview = el('div', { class: 'markdown-body cd-desc-preview' });
-  preview.innerHTML = d.descriptionHtml || '<p class="muted">（空）</p>';
+  // 统一实时预览：透明 textarea 叠加在渲染结果之上（单一输入框，所见即所得地编辑 Markdown）
+  const mirror = el('div', { class: 'md-editor' });
+  const mirrorPreview = el('div', { class: 'markdown-body md-editor-preview' });
+  mirrorPreview.innerHTML = d.descriptionHtml || '';
+  const ta = el('textarea', { class: 'md-editor-input', placeholder: '支持 Markdown…' });
+  ta.value = d.description || '';
   const renderPreview = debounce(async (md: string) => {
-    preview.innerHTML = md.trim() ? await mdToHtml(md) : '<p class="muted">（空）</p>';
-  }, 250);
+    mirrorPreview.innerHTML = md.trim() ? await mdToHtml(md) : '';
+    mirrorPreview.scrollTop = ta.scrollTop;
+  }, 200);
   ta.addEventListener('input', () => void renderPreview(ta.value));
+  ta.addEventListener('scroll', () => {
+    mirrorPreview.scrollTop = ta.scrollTop;
+  });
+  mirror.append(mirrorPreview, ta);
 
   const actions = el('div', { class: 'modal-actions' });
   const save = el('button', { class: 'btn btn-primary btn-sm', type: 'button', text: '保存' });
@@ -188,7 +194,7 @@ function buildDescription(d: CardDetail): HTMLElement {
   cancel.addEventListener('click', hideEditor);
 
   actions.append(save, cancel);
-  editor.append(ta, preview, actions);
+  editor.append(mirror, actions);
   sec.append(view, editor);
   return sec;
 }
