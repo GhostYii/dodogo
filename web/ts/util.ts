@@ -130,7 +130,7 @@ export interface AvatarLike {
 }
 
 /** 头像元素：有头像则用 /api/avatars/{id}，否则显示首字 */
-export function avatar(user: AvatarLike | null | undefined, size: 'xs' | 'sm' | 'md' | 'lg' = 'sm'): HTMLElement {
+export function avatar(user: AvatarLike | null | undefined, size: 'xs' | 'sm' | 'md' | 'lg' | 'xl' = 'sm'): HTMLElement {
   const name = (user?.displayName || user?.username || '?').trim();
   const id = user?.id ?? user?.userId;
   if (user?.avatarPath && id != null) {

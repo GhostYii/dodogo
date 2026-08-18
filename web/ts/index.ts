@@ -12,6 +12,7 @@ import { initSearch } from './search';
 import { initNotifications } from './notifications';
 import { initAdmin } from './admin';
 import { initProjectIcons } from './project-icon';
+import { initUserProfileLinks } from './user-profile';
 
 function init(): void {
   initTheme();
@@ -24,6 +25,7 @@ function init(): void {
 
   initTopbar();
   void initProjectIcons();
+  initUserProfileLinks();
   switch (page) {
     case 'home':
       initHome();
