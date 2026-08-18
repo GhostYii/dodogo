@@ -377,6 +377,7 @@ pub struct ActivityDto {
     pub user_id: Option<i64>,
     pub username: Option<String>,
     pub display_name: Option<String>,
+    pub avatar_path: Option<String>,
     pub action: String,
     pub detail: String,
     pub created_at: chrono::DateTime<chrono::Utc>,

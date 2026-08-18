@@ -106,6 +106,7 @@ export interface ActivityDto {
   userId: number | null;
   username: string | null;
   displayName: string | null;
+  avatarPath: string | null;
   action: string;
   detail: string;
   createdAt: string;

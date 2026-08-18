@@ -600,7 +600,7 @@ function buildActivity(d: CardDetail): HTMLElement {
   if (!d.activities.length) list.append(el('p', { class: 'muted', text: '暂无活动记录' }));
   for (const a of d.activities) {
     const row = el('div', { class: 'activity-row' });
-    row.append(avatar({ id: a.userId ?? undefined, avatarPath: null, displayName: a.displayName, username: a.username }, 'xs'));
+    row.append(avatar({ id: a.userId ?? undefined, avatarPath: a.avatarPath, displayName: a.displayName, username: a.username }, 'xs'));
     const who = a.displayName || a.username || '系统';
     const verb = ACTION_LABELS[a.action] || a.action;
     const whoEl = a.userId != null
