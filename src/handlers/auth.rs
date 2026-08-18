@@ -259,3 +259,20 @@ pub async fn search_users(
         .collect();
     Ok(ok(items))
 }
+
+/// 查看某用户的公开信息（用于成员个人主页）。
+pub async fn get_user(
+    State(state): State<AppState>,
+    _user: RequireAuth,
+    Path(id): Path<i64>,
+) -> AppResult<impl IntoResponse> {
+    let u = repos::get_user_by_id(&state.pool, id).await?.ok_or(AppError::NotFound)?;
+    Ok(ok(json!({
+        "id": u.id,
+        "username": u.username,
+        "displayName": u.display_name,
+        "avatarPath": u.avatar_path,
+        "role": u.role,
+        "createdAt": u.created_at,
+    })))
+}

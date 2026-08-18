@@ -306,6 +306,7 @@ textarea.input { resize: vertical; }
 .avatar-sm { width: 24px; height: 24px; font-size: 11px; }
 .avatar-md { width: 32px; height: 32px; font-size: 13px; }
 .avatar-lg { width: 56px; height: 56px; font-size: 22px; }
+.avatar-xl { width: 88px; height: 88px; font-size: 34px; border-radius: 16px; }
 .avatar-initial { border: 1px solid var(--border); }
 
 /* 项目图标色块 */

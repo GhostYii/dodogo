@@ -31,6 +31,7 @@ pub fn routes() -> axum::Router<AppState> {
         .route("/p/{key}/settings", get(settings_page))
         .route("/search", get(search_page))
         .route("/notifications", get(notifications_page))
+        .route("/users/{user_id}", get(user_profile_page))
         .route("/admin", get(admin_page))
         .route("/admin/users", get(admin_users_page))
         .route("/admin/settings", get(admin_settings_page))
@@ -279,6 +280,26 @@ struct NotificationsPage {
     csrf: String,
     page: String,
     user: UserView,
+}
+
+/// 成员个人主页中的目标用户信息。
+#[derive(Clone)]
+struct TargetUserView {
+    username: String,
+    display_name: String,
+    avatar_url: String,
+    initials: String,
+    role_label: String,
+    created_at: String,
+}
+
+#[derive(Template)]
+#[template(path = "user_profile.html")]
+struct UserProfilePage {
+    csrf: String,
+    page: String,
+    user: UserView,
+    target: TargetUserView,
 }
 
 #[derive(Template)]
@@ -551,6 +572,45 @@ async fn notifications_page(jar: CookieJar, user: Option<axum::Extension<Current
     };
     let (jar, csrf) = page_jar(&jar);
     render_page(jar, &NotificationsPage { csrf, page: "notifications".into(), user: UserView::new(&u) })
+}
+
+// ============ 成员个人主页 ============
+
+async fn user_profile_page(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    user: Option<axum::Extension<CurrentUser>>,
+    Path(user_id): Path<i64>,
+) -> Response {
+    let Some(axum::Extension(u)) = user else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(t) = repos::get_user_by_id(&state.pool, user_id).await.ok().flatten() else {
+        return error_page(jar, "用户不存在", "未找到该成员。");
+    };
+    let avatar_url = if t.avatar_path.is_some() {
+        format!("/api/avatars/{}", t.id)
+    } else {
+        String::new()
+    };
+    let display_name = if t.display_name.trim().is_empty() { t.username.clone() } else { t.display_name.clone() };
+    let (jar, csrf) = page_jar(&jar);
+    render_page(
+        jar,
+        &UserProfilePage {
+            csrf,
+            page: "users".into(),
+            user: UserView::new(&u),
+            target: TargetUserView {
+                username: t.username,
+                initials: initials(&display_name),
+                avatar_url,
+                display_name,
+                role_label: role_label(&t.role),
+                created_at: t.created_at.format("%Y-%m-%d").to_string(),
+            },
+        },
+    )
 }
 
 // ============ 管理后台 ============

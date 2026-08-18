@@ -31,6 +31,7 @@ pub fn build(state: AppState) -> Router {
         .merge(crate::handlers::webhooks::routes())
         .merge(crate::handlers::files::routes())
         .route("/users/search", get(crate::handlers::auth::search_users))
+        .route("/users/{id}", get(crate::handlers::auth::get_user))
         .route("/stream", get(stream))
         .route("/markdown/preview", axum::routing::post(markdown_preview));
 
