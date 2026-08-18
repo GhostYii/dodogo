@@ -408,7 +408,9 @@
     }
     const body = el("div", { class: "profile-form" });
     const avatarRow = el("div", { class: "profile-avatar-row" });
-    avatarRow.append(avatar(me, "lg"));
+    const avatarBox = el("div", { class: "profile-avatar" });
+    avatarBox.append(avatar(me, "lg"));
+    avatarRow.append(avatarBox);
     const fileInput = el("input", { type: "file", accept: "image/*", hidden: "true" });
     const avatarBtn = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "\u66F4\u6362\u5934\u50CF" });
     avatarBtn.addEventListener("click", () => fileInput.click());
@@ -418,9 +420,16 @@
       const fd = new FormData();
       fd.append("file", f);
       try {
-        await api("/auth/avatar", { method: "POST", form: fd });
+        const r = await api("/auth/avatar", { method: "POST", form: fd });
+        me.avatarPath = r.avatarPath;
         toast("\u5934\u50CF\u5DF2\u66F4\u65B0", "success");
-        setTimeout(() => location.reload(), 600);
+        avatarBox.innerHTML = "";
+        avatarBox.append(avatar(me, "lg"));
+        const chip = qs("#user-chip");
+        if (chip) {
+          const old = chip.querySelector(".avatar");
+          if (old) old.replaceWith(avatar(me, "sm"));
+        }
       } catch (e) {
         toast(errMsg(e), "error");
       }
@@ -23256,14 +23265,12 @@ img.ProseMirror-separator {
     return doc3.body.innerHTML;
   }
   function createWysiwygEditor(opts = {}) {
-    const root = el("div", { class: "wys-wrap" });
-    const toolbar = el("div", { class: "wys-toolbar" });
     const content = el("div", { class: "wys-editor" });
     const editor = new Editor({
       element: content,
       extensions: [
         StarterKit.configure({
-          // 全量标题级别，保证 h4–h6 编辑往返不降级（工具栏只暴露 H1–H3）。
+          // 全量标题级别，保证 h4–h6 编辑往返不降级（格式化通过快捷键）。
           heading: { levels: [1, 2, 3, 4, 5, 6] }
         }),
         Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
@@ -23278,61 +23285,8 @@ img.ProseMirror-separator {
       ],
       content: ""
     });
-    const btnRefs = [];
-    const chain = () => editor.chain().focus();
-    function addBtn(label, title, run3, isActive2, cls = "") {
-      const btn = el("button", {
-        class: "wys-btn" + (cls ? " " + cls : ""),
-        type: "button",
-        title,
-        "aria-label": title,
-        text: label
-      });
-      btn.addEventListener("mousedown", (e) => e.preventDefault());
-      btn.addEventListener("click", () => run3());
-      toolbar.append(btn);
-      btnRefs.push({ btn, isActive: isActive2 });
-    }
-    addBtn("B", "\u52A0\u7C97 (Ctrl+B)", () => chain().toggleBold().run(), () => editor.isActive("bold"), "wys-bold");
-    addBtn("I", "\u659C\u4F53 (Ctrl+I)", () => chain().toggleItalic().run(), () => editor.isActive("italic"), "wys-italic");
-    addBtn("S", "\u5220\u9664\u7EBF", () => chain().toggleStrike().run(), () => editor.isActive("strike"), "wys-strike");
-    addBtn("\u4EE3\u7801", "\u884C\u5185\u4EE3\u7801 (Ctrl+E)", () => chain().toggleCode().run(), () => editor.isActive("code"));
-    addBtn("H1", "\u4E00\u7EA7\u6807\u9898", () => chain().toggleHeading({ level: 1 }).run(), () => editor.isActive("heading", { level: 1 }));
-    addBtn("H2", "\u4E8C\u7EA7\u6807\u9898", () => chain().toggleHeading({ level: 2 }).run(), () => editor.isActive("heading", { level: 2 }));
-    addBtn("H3", "\u4E09\u7EA7\u6807\u9898", () => chain().toggleHeading({ level: 3 }).run(), () => editor.isActive("heading", { level: 3 }));
-    addBtn("\u2022 \u5217\u8868", "\u65E0\u5E8F\u5217\u8868", () => chain().toggleBulletList().run(), () => editor.isActive("bulletList"));
-    addBtn("1. \u5217\u8868", "\u6709\u5E8F\u5217\u8868", () => chain().toggleOrderedList().run(), () => editor.isActive("orderedList"));
-    addBtn("\u2611 \u4EFB\u52A1", "\u4EFB\u52A1\u5217\u8868", () => chain().toggleTaskList().run(), () => editor.isActive("taskList"));
-    addBtn("\u5F15\u7528", "\u5F15\u7528", () => chain().toggleBlockquote().run(), () => editor.isActive("blockquote"));
-    addBtn("\u4EE3\u7801\u5757", "\u4EE3\u7801\u5757", () => chain().toggleCodeBlock().run(), () => editor.isActive("codeBlock"));
-    addBtn("\u5206\u5272\u7EBF", "\u5206\u5272\u7EBF", () => chain().setHorizontalRule().run());
-    addBtn("\u94FE\u63A5", "\u63D2\u5165\u94FE\u63A5", () => void insertLink());
-    addBtn("\u53BB\u94FE\u63A5", "\u79FB\u9664\u94FE\u63A5", () => chain().unsetLink().run(), () => editor.isActive("link"));
-    addBtn("\u8868\u683C", "\u63D2\u5165\u8868\u683C (3\xD73)", () => {
-      if (!editor.isActive("table")) chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
-    });
-    async function insertLink() {
-      const url = await promptDialog("\u63D2\u5165\u94FE\u63A5", "https://\u2026");
-      if (!url) return;
-      const href = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : "https://" + url;
-      const { from: from2, to } = editor.state.selection;
-      if (from2 === to) {
-        chain().insertContent({ type: "text", text: url, marks: [{ type: "link", attrs: { href } }] }).run();
-      } else {
-        chain().extendMarkRange("link").setLink({ href }).run();
-      }
-    }
-    function updateActive() {
-      for (const b of btnRefs) {
-        b.btn.classList.toggle("active", !!b.isActive?.());
-      }
-    }
-    editor.on("selectionUpdate", updateActive);
-    editor.on("transaction", updateActive);
-    updateActive();
-    root.append(toolbar, content);
     return {
-      root,
+      root: content,
       editor,
       async setMarkdown(md) {
         if (!md || !md.trim()) {
@@ -23399,11 +23353,14 @@ img.ProseMirror-separator {
     if (currentCardId == null) return;
     const body = qs(".card-detail");
     if (!body) return;
+    const scrollEl = qs(".modal-body");
+    const scrollTop = scrollEl?.scrollTop ?? 0;
     try {
       const d = await api("/cards/" + currentCardId);
       detail = d;
       await loadMeta(d);
       renderDetail(body, d);
+      if (scrollEl) scrollEl.scrollTop = scrollTop;
     } catch {
     }
   }
