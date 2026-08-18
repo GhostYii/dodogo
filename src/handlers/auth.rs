@@ -1,6 +1,6 @@
 //! 认证与用户资料接口（/api/auth/*）
 
-use axum::extract::{Multipart, Path, State};
+use axum::extract::{Multipart, Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use axum_extra::extract::cookie::{Cookie, CookieJar};
@@ -227,4 +227,35 @@ async fn upload_avatar(
         }
     }
     Err(AppError::Param("缺少文件字段".into()))
+}
+
+#[derive(Deserialize)]
+pub struct SearchUsersQuery {
+    q: String,
+}
+
+/// 模糊搜索用户（用于添加成员自动匹配 / @提及）。
+pub async fn search_users(
+    State(state): State<AppState>,
+    _user: RequireAuth,
+    Query(q): Query<SearchUsersQuery>,
+) -> AppResult<impl IntoResponse> {
+    let q = q.q.trim();
+    if q.is_empty() {
+        return Ok(ok(Vec::<serde_json::Value>::new()));
+    }
+    let users = repos::search_users(&state.pool, q, 20).await?;
+    let items: Vec<_> = users
+        .into_iter()
+        .map(|u| {
+            json!({
+                "id": u.id,
+                "username": u.username,
+                "displayName": u.display_name,
+                "avatarPath": u.avatar_path,
+                "email": u.email,
+            })
+        })
+        .collect();
+    Ok(ok(items))
 }

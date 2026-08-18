@@ -292,6 +292,36 @@ textarea.input {
   color: var(--text);
   background: var(--surface-2);
 }
+.autocomplete {
+  position: relative;
+}
+.autocomplete-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  z-index: 40;
+}
+.autocomplete-list[hidden] {
+  display: none;
+}
+.autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.autocomplete-item:hover {
+  background: var(--surface-2);
+}
 .check-row {
   display: flex;
   align-items: center;

@@ -254,7 +254,8 @@ async fn list_members(
 
 #[derive(Deserialize)]
 pub struct AddMemberReq {
-    identity: String,
+    identity: Option<String>,
+    user_id: Option<i64>,
     role: String,
 }
 
@@ -269,7 +270,13 @@ async fn add_members(
     if !permission::role_at_least(&req.role, permission::ROLE_VIEWER) || permission::role_rank(&req.role) > permission::role_rank(permission::ROLE_OWNER) {
         return Err(AppError::Param("无效的角色".into()));
     }
-    let target = repos::get_user_by_identity(&state.pool, &req.identity).await?.ok_or(AppError::NotFound)?;
+    // 优先按 user_id 精确匹配，否则按 identity（用户名/邮箱）
+    let target = if let Some(uid) = req.user_id {
+        repos::get_user_by_id(&state.pool, uid).await?.ok_or(AppError::NotFound)?
+    } else {
+        let identity = req.identity.as_deref().unwrap_or("");
+        repos::get_user_by_identity(&state.pool, identity).await?.ok_or(AppError::NotFound)?
+    };
     if req.role == permission::ROLE_OWNER {
         return Err(AppError::Business("不能直接指定所有者为他人".into()));
     }

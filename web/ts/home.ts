@@ -12,7 +12,17 @@ const ICON_COLORS = ['#3B82F6', '#EF4444', '#F97316', '#EAB308', '#22C55E', '#06
 export function initHome(): void {
   qs('#btn-new-project')?.addEventListener('click', openNewProjectModal);
   void loadMyTasks();
+  // 收到指派/移动等通知时，实时刷新“我的任务”（卡片更换指派者后新成员主页即时更新）
+  window.addEventListener('dodogo:notify', (e) => {
+    const d = (e as CustomEvent).detail as { type?: string } | undefined;
+    if (d?.type === 'assigned' || d?.type === 'moved') {
+      if (taskRefreshTimer) clearTimeout(taskRefreshTimer);
+      taskRefreshTimer = setTimeout(() => void loadMyTasks(), 800);
+    }
+  });
 }
+
+let taskRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 
 // ============ 新建项目 ============
 

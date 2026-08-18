@@ -176,7 +176,16 @@ async function refreshUnread(): Promise<void> {
 
 function initUnreadSse(): void {
   const es = new EventSource('/api/stream');
-  es.addEventListener('notification.new', () => void refreshUnread());
+  es.addEventListener('notification.new', (ev) => {
+    void refreshUnread();
+    // 广播给页面其他模块（如工作台刷新“我的任务”）
+    try {
+      const d = JSON.parse((ev as MessageEvent).data);
+      window.dispatchEvent(new CustomEvent('dodogo:notify', { detail: d }));
+    } catch {
+      /* ignore */
+    }
+  });
   es.onerror = () => {
     /* EventSource 自动重连 */
   };

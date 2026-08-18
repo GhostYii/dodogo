@@ -116,6 +116,22 @@ pub async fn list_users(pool: &SqlitePool, offset: i64, limit: i64, q: Option<&s
     Ok(users)
 }
 
+/// 按用户名/昵称/邮箱模糊搜索用户（用于添加成员自动匹配）。
+pub async fn search_users(pool: &SqlitePool, q: &str, limit: i64) -> AppResult<Vec<User>> {
+    let like = format!("%{q}%");
+    let rows = sqlx::query_as::<_, User>(
+        "SELECT * FROM users WHERE username LIKE ? OR display_name LIKE ? OR email LIKE ? \
+         ORDER BY username LIMIT ?",
+    )
+    .bind(&like)
+    .bind(&like)
+    .bind(&like)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
 pub async fn update_user_profile(
     pool: &SqlitePool,
     id: i64,

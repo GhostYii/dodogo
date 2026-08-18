@@ -105,8 +105,57 @@ function render(listEl: HTMLElement, members: MemberDto[], reload: () => Promise
 
 function openAddModal(projectKey: string, reload: () => Promise<void>): void {
   const body = el('div', { class: 'form-stack' });
-  const identityInput = el('input', { class: 'input', type: 'text', placeholder: '用户名或邮箱' });
-  body.append(formField('成员（用户名或邮箱）', identityInput));
+
+  let selectedUserId: number | null = null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const identityInput = el('input', { class: 'input', type: 'text', placeholder: '输入用户名 / 昵称 / 邮箱模糊搜索', autocomplete: 'off' });
+  const wrap = el('div', { class: 'autocomplete' });
+  const dropdown = el('div', { class: 'autocomplete-list', hidden: 'true' });
+  wrap.append(identityInput, dropdown);
+  body.append(formField('成员（模糊搜索）', wrap));
+
+  async function search(q: string): Promise<void> {
+    if (!q.trim()) {
+      dropdown.hidden = true;
+      dropdown.innerHTML = '';
+      return;
+    }
+    try {
+      const users = await api<Array<{ id: number; username: string; displayName: string; avatarPath: string | null; email?: string | null }>>(
+        '/users/search?q=' + encodeURIComponent(q.trim()),
+      );
+      dropdown.innerHTML = '';
+      if (!users.length) {
+        dropdown.hidden = true;
+        return;
+      }
+      for (const u of users) {
+        const item = el('div', { class: 'autocomplete-item' });
+        item.append(avatar({ id: u.id, avatarPath: u.avatarPath, displayName: u.displayName, username: u.username }, 'xs'));
+        item.append(el('span', { class: 'cell-name', text: u.displayName || u.username }));
+        if (u.username && u.displayName !== u.username) item.append(el('span', { class: 'muted', text: '@' + u.username }));
+        item.addEventListener('click', () => {
+          selectedUserId = u.id;
+          identityInput.value = u.displayName || u.username;
+          dropdown.hidden = true;
+        });
+        dropdown.append(item);
+      }
+      dropdown.hidden = false;
+    } catch {
+      dropdown.hidden = true;
+    }
+  }
+
+  identityInput.addEventListener('input', () => {
+    selectedUserId = null;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => void search(identityInput.value), 250);
+  });
+  document.addEventListener('pointerdown', (e) => {
+    if (!wrap.contains(e.target as Node)) dropdown.hidden = true;
+  });
 
   const roleSel = el('select', { class: 'select' });
   for (const [v, t] of ROLE_OPTIONS) {
@@ -121,13 +170,16 @@ function openAddModal(projectKey: string, reload: () => Promise<void>): void {
   cancel.addEventListener('click', () => closeModal());
   ok.addEventListener('click', async () => {
     const identity = identityInput.value.trim();
-    if (!identity) {
-      toast('请输入用户名或邮箱', 'error');
+    if (!selectedUserId && !identity) {
+      toast('请输入或选择成员', 'error');
       return;
     }
     ok.disabled = true;
     try {
-      await api(`/projects/${projectKey}/members`, { method: 'POST', body: { identity, role: roleSel.value } });
+      await api(`/projects/${projectKey}/members`, {
+        method: 'POST',
+        body: { user_id: selectedUserId ?? undefined, identity: selectedUserId ? undefined : identity, role: roleSel.value },
+      });
       toast('已添加', 'success');
       closeModal();
       await reload();

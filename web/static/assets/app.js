@@ -473,7 +473,14 @@
   }
   function initUnreadSse() {
     const es = new EventSource("/api/stream");
-    es.addEventListener("notification.new", () => void refreshUnread());
+    es.addEventListener("notification.new", (ev) => {
+      void refreshUnread();
+      try {
+        const d = JSON.parse(ev.data);
+        window.dispatchEvent(new CustomEvent("dodogo:notify", { detail: d }));
+      } catch {
+      }
+    });
     es.onerror = () => {
     };
     setInterval(() => void refreshUnread(), 12e4);
@@ -1138,7 +1145,15 @@
   function initHome() {
     qs("#btn-new-project")?.addEventListener("click", openNewProjectModal);
     void loadMyTasks();
+    window.addEventListener("dodogo:notify", (e) => {
+      const d = e.detail;
+      if (d?.type === "assigned" || d?.type === "moved") {
+        if (taskRefreshTimer) clearTimeout(taskRefreshTimer);
+        taskRefreshTimer = setTimeout(() => void loadMyTasks(), 800);
+      }
+    });
   }
+  var taskRefreshTimer;
   function openNewProjectModal() {
     const body = el("div", { class: "form-stack" });
     const keyInput = el("input", { class: "input", type: "text", placeholder: "\u5982 DODG\uFF082-6 \u4F4D\u5927\u5199\u5B57\u6BCD/\u6570\u5B57\uFF09", maxlength: "6" });
@@ -2199,8 +2214,53 @@
   }
   function openAddModal(projectKey3, reload) {
     const body = el("div", { class: "form-stack" });
-    const identityInput = el("input", { class: "input", type: "text", placeholder: "\u7528\u6237\u540D\u6216\u90AE\u7BB1" });
-    body.append(formField("\u6210\u5458\uFF08\u7528\u6237\u540D\u6216\u90AE\u7BB1\uFF09", identityInput));
+    let selectedUserId = null;
+    let timer;
+    const identityInput = el("input", { class: "input", type: "text", placeholder: "\u8F93\u5165\u7528\u6237\u540D / \u6635\u79F0 / \u90AE\u7BB1\u6A21\u7CCA\u641C\u7D22", autocomplete: "off" });
+    const wrap = el("div", { class: "autocomplete" });
+    const dropdown = el("div", { class: "autocomplete-list", hidden: "true" });
+    wrap.append(identityInput, dropdown);
+    body.append(formField("\u6210\u5458\uFF08\u6A21\u7CCA\u641C\u7D22\uFF09", wrap));
+    async function search(q) {
+      if (!q.trim()) {
+        dropdown.hidden = true;
+        dropdown.innerHTML = "";
+        return;
+      }
+      try {
+        const users = await api(
+          "/users/search?q=" + encodeURIComponent(q.trim())
+        );
+        dropdown.innerHTML = "";
+        if (!users.length) {
+          dropdown.hidden = true;
+          return;
+        }
+        for (const u of users) {
+          const item = el("div", { class: "autocomplete-item" });
+          item.append(avatar({ id: u.id, avatarPath: u.avatarPath, displayName: u.displayName, username: u.username }, "xs"));
+          item.append(el("span", { class: "cell-name", text: u.displayName || u.username }));
+          if (u.username && u.displayName !== u.username) item.append(el("span", { class: "muted", text: "@" + u.username }));
+          item.addEventListener("click", () => {
+            selectedUserId = u.id;
+            identityInput.value = u.displayName || u.username;
+            dropdown.hidden = true;
+          });
+          dropdown.append(item);
+        }
+        dropdown.hidden = false;
+      } catch {
+        dropdown.hidden = true;
+      }
+    }
+    identityInput.addEventListener("input", () => {
+      selectedUserId = null;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void search(identityInput.value), 250);
+    });
+    document.addEventListener("pointerdown", (e) => {
+      if (!wrap.contains(e.target)) dropdown.hidden = true;
+    });
     const roleSel = el("select", { class: "select" });
     for (const [v, t] of ROLE_OPTIONS) {
       if (v === "owner") continue;
@@ -2213,13 +2273,16 @@
     cancel.addEventListener("click", () => closeModal());
     ok.addEventListener("click", async () => {
       const identity = identityInput.value.trim();
-      if (!identity) {
-        toast("\u8BF7\u8F93\u5165\u7528\u6237\u540D\u6216\u90AE\u7BB1", "error");
+      if (!selectedUserId && !identity) {
+        toast("\u8BF7\u8F93\u5165\u6216\u9009\u62E9\u6210\u5458", "error");
         return;
       }
       ok.disabled = true;
       try {
-        await api(`/projects/${projectKey3}/members`, { method: "POST", body: { identity, role: roleSel.value } });
+        await api(`/projects/${projectKey3}/members`, {
+          method: "POST",
+          body: { user_id: selectedUserId ?? void 0, identity: selectedUserId ? void 0 : identity, role: roleSel.value }
+        });
         toast("\u5DF2\u6DFB\u52A0", "success");
         closeModal();
         await reload();

@@ -30,6 +30,7 @@ pub fn build(state: AppState) -> Router {
         .merge(crate::handlers::gitlab::routes())
         .merge(crate::handlers::webhooks::routes())
         .merge(crate::handlers::files::routes())
+        .route("/users/search", get(crate::handlers::auth::search_users))
         .route("/stream", get(stream))
         .route("/markdown/preview", axum::routing::post(markdown_preview));
 
@@ -105,10 +106,12 @@ async fn stream(State(state): State<AppState>, user: RequireAuth, Query(q): Quer
     let stream = BroadcastStream::new(rx)
         .filter(move |item| match item {
             Ok(ev) => {
-                channel.is_empty()
-                    || ev.channel == channel
-                    || ev.channel == user_channel
-                    || ev.channel.starts_with("user:")
+                // 未指定频道：仅推送本人通知；指定频道：推送该频道 + 本人通知
+                if channel.is_empty() {
+                    ev.channel == user_channel
+                } else {
+                    ev.channel == channel || ev.channel == user_channel
+                }
             }
             Err(_) => false,
         })
