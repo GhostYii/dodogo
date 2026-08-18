@@ -1,10 +1,12 @@
 // 顶栏：主题切换、用户菜单、全局搜索、未读通知（SSE + 轮询）、快捷键
 
 import { api, errMsg } from './api';
-import { el, qs, qsa, avatar, formField, isTyping, addPasswordToggles } from './util';
+import { el, qs, qsa, avatar, formField, isTyping, addPasswordToggles, timeAgo } from './util';
 import { toggleTheme } from './theme';
 import { toast } from './toast';
 import { openModal } from './modal';
+import { openCardDetail } from './card-modal';
+import type { NotificationDto } from './types';
 
 export function initTopbar(): void {
   qs('#theme-toggle')?.addEventListener('click', toggleTheme);
@@ -40,6 +42,7 @@ export function initTopbar(): void {
   void refreshUnread();
   initUnreadSse();
   initShortcuts();
+  initNotifPopup();
 }
 
 // ============ 版本号 ============
@@ -201,6 +204,103 @@ function initUnreadSse(): void {
   };
   // 兜底轮询，防止 SSE 偶发断开
   setInterval(() => void refreshUnread(), 120000);
+}
+
+// ============ 通知弹出面板 ============
+
+const CARD_LINK_RE = /\/p\/([^/]+)\/card\/(\d+)/;
+
+function initNotifPopup(): void {
+  const bell = qs('#bell-btn');
+  const popup = qs<HTMLElement>('#notif-popup');
+  const listEl = qs<HTMLElement>('#notif-popup-list');
+  if (!bell || !popup || !listEl) return;
+
+  let page = 1;
+  let loading = false;
+  let done = false;
+
+  function renderItem(n: NotificationDto): HTMLElement {
+    const row = el('div', { class: 'notif-row' + (n.read ? '' : ' unread') });
+    const dot = el('span', { class: 'notif-dot' });
+    const main = el('div', { class: 'notif-main' });
+    main.append(el('div', { class: 'notif-title', text: n.title }));
+    if (n.body) main.append(el('div', { class: 'muted notif-body', text: n.body }));
+    main.append(el('div', { class: 'muted', text: timeAgo(n.createdAt) }));
+    row.append(dot, main);
+    row.addEventListener('click', async () => {
+      if (!n.read) {
+        try {
+          await api(`/notifications/${n.id}/read`, { method: 'POST' });
+          n.read = true;
+          row.classList.remove('unread');
+          void refreshUnread();
+        } catch {
+          /* ignore */
+        }
+      }
+      const m = CARD_LINK_RE.exec(n.link || '');
+      if (m) {
+        popup!.hidden = true;
+        void openCardDetail(Number(m[2]));
+      } else if (n.link) {
+        location.href = n.link;
+      }
+    });
+    return row;
+  }
+
+  async function loadMore(): Promise<void> {
+    if (loading || done) return;
+    loading = true;
+    try {
+      const items = await api<NotificationDto[]>(`/notifications?page=${page}&page_size=20`);
+      if (items.length < 20) done = true;
+      if (page === 1) listEl!.innerHTML = '';
+      if (!items.length && page === 1) listEl!.innerHTML = '<div class="empty">暂无通知</div>';
+      for (const n of items) listEl!.append(renderItem(n));
+      page += 1;
+    } catch {
+      if (page === 1) listEl!.innerHTML = '<div class="empty">加载失败</div>';
+    } finally {
+      loading = false;
+    }
+  }
+
+  bell.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (popup.hidden) {
+      popup.hidden = false;
+      page = 1;
+      done = false;
+      listEl.innerHTML = '<div class="muted loading">加载中…</div>';
+      void loadMore();
+    } else {
+      popup.hidden = true;
+    }
+  });
+
+  document.addEventListener('pointerdown', (e) => {
+    const t = e.target as Node;
+    if (!popup.hidden && !popup.contains(t) && !bell.contains(t)) popup.hidden = true;
+  });
+
+  listEl.addEventListener('scroll', () => {
+    if (listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - 40) void loadMore();
+  });
+
+  qs('#notif-popup-read-all')?.addEventListener('click', async () => {
+    try {
+      await api('/notifications/read-all', { method: 'POST' });
+      listEl.innerHTML = '';
+      page = 1;
+      done = false;
+      void loadMore();
+      void refreshUnread();
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    }
+  });
 }
 
 // ============ 快捷键 ============
