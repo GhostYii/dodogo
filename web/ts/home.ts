@@ -20,6 +20,11 @@ export function initHome(): void {
       taskRefreshTimer = setTimeout(() => void loadMyTasks(), 800);
     }
   });
+  // 卡片详情弹窗内修改（如更改指派人/移动）后，刷新“我的任务”
+  window.addEventListener('dodogo:card-changed', () => {
+    if (taskRefreshTimer) clearTimeout(taskRefreshTimer);
+    taskRefreshTimer = setTimeout(() => void loadMyTasks(), 500);
+  });
 }
 
 let taskRefreshTimer: ReturnType<typeof setTimeout> | undefined;
