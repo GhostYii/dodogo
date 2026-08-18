@@ -91,7 +91,9 @@ async function openProfileModal(): Promise<void> {
   const body = el('div', { class: 'profile-form' });
 
   const avatarRow = el('div', { class: 'profile-avatar-row' });
-  avatarRow.append(avatar(me, 'lg'));
+  const avatarBox = el('div', { class: 'profile-avatar' });
+  avatarBox.append(avatar(me, 'lg'));
+  avatarRow.append(avatarBox);
   const fileInput = el('input', { type: 'file', accept: 'image/*', hidden: 'true' });
   const avatarBtn = el('button', { class: 'btn btn-ghost btn-sm', type: 'button', text: '更换头像' });
   avatarBtn.addEventListener('click', () => fileInput.click());
@@ -101,9 +103,17 @@ async function openProfileModal(): Promise<void> {
     const fd = new FormData();
     fd.append('file', f);
     try {
-      await api('/auth/avatar', { method: 'POST', form: fd });
+      const r = await api<{ avatarPath: string | null }>('/auth/avatar', { method: 'POST', form: fd });
+      me.avatarPath = r.avatarPath;
       toast('头像已更新', 'success');
-      setTimeout(() => location.reload(), 600);
+      // 就地更新头像（弹窗内与顶栏），不刷新页面、不关闭弹窗
+      avatarBox.innerHTML = '';
+      avatarBox.append(avatar(me, 'lg'));
+      const chip = qs('#user-chip');
+      if (chip) {
+        const old = chip.querySelector('.avatar');
+        if (old) old.replaceWith(avatar(me, 'sm'));
+      }
     } catch (e) {
       toast(errMsg(e), 'error');
     }
