@@ -22,12 +22,8 @@
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  background: var(--primary);
-  color: #fff;
-  display: inline-grid;
-  place-items: center;
-  font-weight: 800;
-  font-size: 15px;
+  object-fit: contain;
+  display: block;
 }
 
 .topbar-search { flex: 1; max-width: 440px; position: relative; }
@@ -107,12 +103,8 @@
   width: 52px;
   height: 52px;
   border-radius: 12px;
-  background: var(--primary);
-  color: #fff;
-  font-size: 28px;
-  font-weight: 800;
-  display: inline-grid;
-  place-items: center;
+  object-fit: contain;
+  display: inline-block;
   margin-bottom: 10px;
 }
 .auth-title { font-size: 20px; margin: 0 0 4px; }

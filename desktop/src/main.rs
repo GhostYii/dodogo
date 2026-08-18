@@ -101,6 +101,14 @@ fn ensure_server() -> (Option<Child>, u16) {
     (None, DEFAULT_PORT)
 }
 
+/// 从内嵌的 icon.png 加载窗口图标。
+fn load_icon() -> Option<tao::window::Icon> {
+    let bytes = include_bytes!("../icon.png");
+    let img = image::load_from_memory(bytes).ok()?.to_rgba8();
+    let (w, h) = img.dimensions();
+    tao::window::Icon::from_rgba(img.into_raw(), w, h).ok()
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (mut server, port) = ensure_server();
     if !health_ok(port) {
@@ -109,10 +117,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let app_url = format!("http://{HOST}:{port}");
+    let title = format!("[DoDoGo v{}]", env!("CARGO_PKG_VERSION"));
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
-        .with_title("DoDoGo 项目管理")
+        .with_title(title)
         .with_inner_size(LogicalSize::new(1280.0, 800.0))
+        .with_window_icon(load_icon())
         .build(&event_loop)?;
 
     let _webview = WebViewBuilder::new().with_url(&app_url).build(&window)?;
