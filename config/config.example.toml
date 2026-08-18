@@ -3,6 +3,7 @@
 
 [server]
 host = "127.0.0.1"
+# 端口：8080 为默认；设为 0 表示由系统自动分配空闲端口（实际端口写入 data/server.port）
 port = 8080
 
 data_dir = "./data"

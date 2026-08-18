@@ -25,7 +25,12 @@ async fn main() -> anyhow::Result<()> {
 
     let addr = format!("{}:{}", config.server.host, config.server.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    tracing::info!("DoDoGo 已启动: http://{addr}");
+    // 绑定后取实际端口（配置 port=0 时由系统自动分配空闲端口）
+    let actual_port = listener.local_addr()?.port();
+    // 将实际端口写入数据目录，便于桌面客户端/脚本发现
+    let port_file = config.data_dir().join("server.port");
+    let _ = std::fs::write(&port_file, actual_port.to_string());
+    tracing::info!("DoDoGo 已启动: http://{}:{actual_port}", config.server.host);
 
     let router = dodogo::routes::build(state);
     axum::serve(listener, router)
