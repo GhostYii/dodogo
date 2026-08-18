@@ -16,7 +16,6 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { el } from './util';
 import { mdToHtml } from './markdown';
 import { htmlToMarkdown } from './html2md';
-import { promptDialog } from './modal';
 
 export interface WysiwygEditor {
   /** 编辑器根容器（工具栏 + 编辑区） */
@@ -129,15 +128,13 @@ function prepareHtml(html: string): string {
 // ---------- 编辑器工厂 ----------
 
 export function createWysiwygEditor(opts: { placeholder?: string } = {}): WysiwygEditor {
-  const root = el('div', { class: 'wys-wrap' });
-  const toolbar = el('div', { class: 'wys-toolbar' });
   const content = el('div', { class: 'wys-editor' });
 
   const editor = new Editor({
     element: content,
     extensions: [
       StarterKit.configure({
-        // 全量标题级别，保证 h4–h6 编辑往返不降级（工具栏只暴露 H1–H3）。
+        // 全量标题级别，保证 h4–h6 编辑往返不降级（格式化通过快捷键）。
         heading: { levels: [1, 2, 3, 4, 5, 6] },
       }),
       Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
@@ -153,75 +150,8 @@ export function createWysiwygEditor(opts: { placeholder?: string } = {}): Wysiwy
     content: '',
   });
 
-  interface BtnRef {
-    btn: HTMLButtonElement;
-    isActive?: () => boolean;
-  }
-  const btnRefs: BtnRef[] = [];
-
-  const chain = () => editor.chain().focus();
-
-  function addBtn(label: string, title: string, run: () => void, isActive?: () => boolean, cls = ''): void {
-    const btn = el('button', {
-      class: 'wys-btn' + (cls ? ' ' + cls : ''),
-      type: 'button',
-      title,
-      'aria-label': title,
-      text: label,
-    }) as HTMLButtonElement;
-    // 阻止按钮抢走编辑器焦点/选区
-    btn.addEventListener('mousedown', (e) => e.preventDefault());
-    btn.addEventListener('click', () => run());
-    toolbar.append(btn);
-    btnRefs.push({ btn, isActive });
-  }
-
-  addBtn('B', '加粗 (Ctrl+B)', () => chain().toggleBold().run(), () => editor.isActive('bold'), 'wys-bold');
-  addBtn('I', '斜体 (Ctrl+I)', () => chain().toggleItalic().run(), () => editor.isActive('italic'), 'wys-italic');
-  addBtn('S', '删除线', () => chain().toggleStrike().run(), () => editor.isActive('strike'), 'wys-strike');
-  addBtn('代码', '行内代码 (Ctrl+E)', () => chain().toggleCode().run(), () => editor.isActive('code'));
-  addBtn('H1', '一级标题', () => chain().toggleHeading({ level: 1 }).run(), () => editor.isActive('heading', { level: 1 }));
-  addBtn('H2', '二级标题', () => chain().toggleHeading({ level: 2 }).run(), () => editor.isActive('heading', { level: 2 }));
-  addBtn('H3', '三级标题', () => chain().toggleHeading({ level: 3 }).run(), () => editor.isActive('heading', { level: 3 }));
-  addBtn('• 列表', '无序列表', () => chain().toggleBulletList().run(), () => editor.isActive('bulletList'));
-  addBtn('1. 列表', '有序列表', () => chain().toggleOrderedList().run(), () => editor.isActive('orderedList'));
-  addBtn('☑ 任务', '任务列表', () => chain().toggleTaskList().run(), () => editor.isActive('taskList'));
-  addBtn('引用', '引用', () => chain().toggleBlockquote().run(), () => editor.isActive('blockquote'));
-  addBtn('代码块', '代码块', () => chain().toggleCodeBlock().run(), () => editor.isActive('codeBlock'));
-  addBtn('分割线', '分割线', () => chain().setHorizontalRule().run());
-  addBtn('链接', '插入链接', () => void insertLink());
-  addBtn('去链接', '移除链接', () => chain().unsetLink().run(), () => editor.isActive('link'));
-  addBtn('表格', '插入表格 (3×3)', () => {
-    if (!editor.isActive('table')) chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
-  });
-
-  async function insertLink(): Promise<void> {
-    const url = await promptDialog('插入链接', 'https://…');
-    if (!url) return;
-    const href = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : 'https://' + url;
-    const { from, to } = editor.state.selection;
-    if (from === to) {
-      chain()
-        .insertContent({ type: 'text', text: url, marks: [{ type: 'link', attrs: { href } }] })
-        .run();
-    } else {
-      chain().extendMarkRange('link').setLink({ href }).run();
-    }
-  }
-
-  function updateActive(): void {
-    for (const b of btnRefs) {
-      b.btn.classList.toggle('active', !!b.isActive?.());
-    }
-  }
-  editor.on('selectionUpdate', updateActive);
-  editor.on('transaction', updateActive);
-  updateActive();
-
-  root.append(toolbar, content);
-
   return {
-    root,
+    root: content,
     editor,
     async setMarkdown(md: string): Promise<void> {
       if (!md || !md.trim()) {
