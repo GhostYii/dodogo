@@ -239,9 +239,8 @@
   }
 
   // ts/modal.ts
-  var activeModal = null;
+  var modalStack = [];
   function openModal(opts) {
-    closeModal(false);
     const backdrop = el("div", { class: "modal-backdrop" });
     const modal = el("div", { class: "modal" });
     if (opts.width) modal.style.maxWidth = opts.width;
@@ -263,7 +262,7 @@
     }
     backdrop.append(modal);
     document.body.append(backdrop);
-    activeModal = modal;
+    modalStack.push(backdrop);
     backdrop.addEventListener("mousedown", (e) => {
       if (e.target === backdrop) closeModal();
     });
@@ -279,7 +278,7 @@
     return modal;
   }
   function closeModal(runCallback = true) {
-    const backdrop = document.querySelector(".modal-backdrop");
+    const backdrop = modalStack.pop();
     if (!backdrop) return;
     const modal = backdrop.querySelector(".modal");
     if (modal) {
@@ -288,7 +287,6 @@
       if (runCallback) m.__onClose?.();
     }
     backdrop.remove();
-    activeModal = null;
   }
   function confirmDialog(message, opts = {}) {
     return new Promise((resolve) => {
@@ -728,14 +726,20 @@
     view.innerHTML = d.descriptionHtml || '<p class="muted">\u6682\u65E0\u63CF\u8FF0\uFF0C\u70B9\u51FB\u7F16\u8F91\u6DFB\u52A0\u3002</p>';
     view.addEventListener("click", () => showEditor());
     const editor = el("div", { class: "cd-desc-editor", hidden: "true" });
-    const ta = el("textarea", { class: "input", rows: "8", placeholder: "\u652F\u6301 Markdown\u2026" });
+    const mirror = el("div", { class: "md-editor" });
+    const mirrorPreview = el("div", { class: "markdown-body md-editor-preview" });
+    mirrorPreview.innerHTML = d.descriptionHtml || "";
+    const ta = el("textarea", { class: "md-editor-input", placeholder: "\u652F\u6301 Markdown\u2026" });
     ta.value = d.description || "";
-    const preview = el("div", { class: "markdown-body cd-desc-preview" });
-    preview.innerHTML = d.descriptionHtml || '<p class="muted">\uFF08\u7A7A\uFF09</p>';
     const renderPreview = debounce(async (md) => {
-      preview.innerHTML = md.trim() ? await mdToHtml(md) : '<p class="muted">\uFF08\u7A7A\uFF09</p>';
-    }, 250);
+      mirrorPreview.innerHTML = md.trim() ? await mdToHtml(md) : "";
+      mirrorPreview.scrollTop = ta.scrollTop;
+    }, 200);
     ta.addEventListener("input", () => void renderPreview(ta.value));
+    ta.addEventListener("scroll", () => {
+      mirrorPreview.scrollTop = ta.scrollTop;
+    });
+    mirror.append(mirrorPreview, ta);
     const actions = el("div", { class: "modal-actions" });
     const save = el("button", { class: "btn btn-primary btn-sm", type: "button", text: "\u4FDD\u5B58" });
     const cancel = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "\u53D6\u6D88" });
@@ -764,7 +768,7 @@
     });
     cancel.addEventListener("click", hideEditor);
     actions.append(save, cancel);
-    editor.append(ta, preview, actions);
+    editor.append(mirror, actions);
     sec.append(view, editor);
     return sec;
   }
@@ -1151,6 +1155,10 @@
         if (taskRefreshTimer) clearTimeout(taskRefreshTimer);
         taskRefreshTimer = setTimeout(() => void loadMyTasks(), 800);
       }
+    });
+    window.addEventListener("dodogo:card-changed", () => {
+      if (taskRefreshTimer) clearTimeout(taskRefreshTimer);
+      taskRefreshTimer = setTimeout(() => void loadMyTasks(), 500);
     });
   }
   var taskRefreshTimer;

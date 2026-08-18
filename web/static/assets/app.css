@@ -1814,15 +1814,48 @@ textarea.input {
   flex-direction: column;
   gap: 8px;
 }
-.editor-tabs {
-  display: flex;
-  gap: 4px;
-}
-.cd-desc-preview {
+.md-editor {
+  position: relative;
+  min-height: 160px;
   border: 1px solid var(--border);
   border-radius: 6px;
+  background: var(--surface);
+}
+.md-editor:focus-within {
+  border-color: var(--primary);
+}
+.md-editor-preview {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
   padding: 10px;
-  min-height: 80px;
+  pointer-events: none;
+  line-height: 1.6;
+  color: var(--text);
+}
+.md-editor-input {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 160px;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  resize: vertical;
+  outline: none;
+}
+.md-editor-input::placeholder {
+  color: var(--text-2);
+}
+.md-editor-input::selection {
+  background: rgba(59, 130, 246, 0.22);
 }
 .wys-toolbar {
   display: flex;
