@@ -24,7 +24,7 @@
   {% if has_projects %}
   <div class="project-grid">
     {% for p in projects %}
-    <a class="project-card" href="/p/{{ p.key }}">
+    <a class="project-card" href="/p/{{ p.key }}" data-project-key="{{ p.key }}">
       <span class="project-icon" style="background-color: {{ p.icon_color }}">{{ p.initials }}</span>
       <div class="project-card-meta">
         <span class="project-card-name">{{ p.name }}</span>

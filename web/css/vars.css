@@ -267,6 +267,15 @@ textarea.input { resize: vertical; }
   width: 40px;
   height: 40px;
   font-size: 15px;
+  position: relative;
+  overflow: hidden;
+}
+.project-icon-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .project-icon-sm { width: 28px; height: 28px; font-size: 12px; border-radius: 6px; }
 .project-icon-lg { width: 48px; height: 48px; font-size: 18px; border-radius: 10px; }

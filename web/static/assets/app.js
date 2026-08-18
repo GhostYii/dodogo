@@ -570,6 +570,213 @@
     }
   }
 
+  // ts/html2md.ts
+  var BLOCK_TAGS = /* @__PURE__ */ new Set([
+    "P",
+    "DIV",
+    "H1",
+    "H2",
+    "H3",
+    "H4",
+    "H5",
+    "H6",
+    "UL",
+    "OL",
+    "BLOCKQUOTE",
+    "PRE",
+    "TABLE",
+    "HR",
+    "LI"
+  ]);
+  function isBlock(node) {
+    return node.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has(node.tagName);
+  }
+  function inline(node) {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
+    if (node.nodeType !== Node.ELEMENT_NODE) return "";
+    const el2 = node;
+    const inner = () => Array.from(el2.childNodes).map(inline).join("");
+    switch (el2.tagName) {
+      case "STRONG":
+      case "B":
+        return `**${inner()}**`;
+      case "EM":
+      case "I":
+        return `*${inner()}*`;
+      case "DEL":
+      case "S":
+      case "STRIKE":
+        return `~~${inner()}~~`;
+      case "CODE":
+        return `\`${inner()}\``;
+      case "A": {
+        const href = el2.getAttribute("href") || "";
+        const text = inner();
+        if (!href) return text;
+        if (href.startsWith("/search?q=")) {
+          const q = decodeURIComponent(href.slice("/search?q=".length));
+          return `[[${q}]]`;
+        }
+        if (text === href) return `<${href}>`;
+        return `[${text}](${href})`;
+      }
+      case "IMG": {
+        const src = el2.getAttribute("src") || "";
+        const alt = el2.getAttribute("alt") || "";
+        return `![${alt}](${src})`;
+      }
+      case "BR":
+        return "  \n";
+      case "INPUT": {
+        return el2.hasAttribute("checked") ? "[x] " : "[ ] ";
+      }
+      default:
+        return inner();
+    }
+  }
+  function blocks(container2) {
+    let out = "";
+    let buf = "";
+    const flush = () => {
+      const t = buf.trim();
+      if (t) out += t + "\n\n";
+      buf = "";
+    };
+    for (const child of Array.from(container2.childNodes)) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        buf += child.textContent ?? "";
+        continue;
+      }
+      if (child.nodeType !== Node.ELEMENT_NODE) continue;
+      if (isBlock(child)) {
+        flush();
+        out += blockNode(child);
+      } else {
+        buf += inline(child);
+      }
+    }
+    flush();
+    return out;
+  }
+  function blockNode(el2) {
+    switch (el2.tagName) {
+      case "P": {
+        const t = inline(el2).trim();
+        return t ? t + "\n\n" : "\n";
+      }
+      case "DIV":
+        return blocks(el2);
+      case "H1":
+        return `# ${inline(el2)}
+
+`;
+      case "H2":
+        return `## ${inline(el2)}
+
+`;
+      case "H3":
+        return `### ${inline(el2)}
+
+`;
+      case "H4":
+        return `#### ${inline(el2)}
+
+`;
+      case "H5":
+        return `##### ${inline(el2)}
+
+`;
+      case "H6":
+        return `###### ${inline(el2)}
+
+`;
+      case "HR":
+        return "---\n\n";
+      case "BLOCKQUOTE": {
+        const inner = blocks(el2).trim().replace(/\n/g, "\n> ");
+        return `> ${inner}
+
+`;
+      }
+      case "UL":
+        return list(el2, false) + "\n";
+      case "OL":
+        return list(el2, true) + "\n";
+      case "PRE": {
+        const txt = el2.textContent ?? "";
+        return "```\n" + txt.replace(/\n+$/, "") + "\n```\n\n";
+      }
+      case "TABLE":
+        return table(el2) + "\n\n";
+      case "LI":
+        return inline(el2);
+      default:
+        return blocks(el2);
+    }
+  }
+  function list(el2, ordered) {
+    let out = "";
+    let n = 0;
+    for (const child of Array.from(el2.children)) {
+      if (child.tagName !== "LI") continue;
+      n++;
+      const li = child;
+      const marker = ordered ? `${n}. ` : "- ";
+      const lines = [];
+      let buf = "";
+      const flush = () => {
+        const t = buf.trim();
+        if (t) lines.push(t);
+        buf = "";
+      };
+      for (const node of Array.from(li.childNodes)) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          buf += node.textContent ?? "";
+          continue;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) continue;
+        const tag = node.tagName;
+        if (tag === "UL" || tag === "OL") {
+          flush();
+          lines.push(list(node, tag === "OL").replace(/\n+$/, ""));
+        } else if (tag === "P" || tag === "DIV") {
+          flush();
+          const t = inline(node).trim();
+          if (t) lines.push(t);
+        } else {
+          buf += inline(node);
+        }
+      }
+      flush();
+      if (!lines.length) lines.push("");
+      out += marker + lines[0] + "\n";
+      for (let i = 1; i < lines.length; i++) out += indent(lines[i], 2) + "\n";
+    }
+    return out;
+  }
+  function indent(text, spaces) {
+    const pad = " ".repeat(spaces);
+    return text.split("\n").map((l) => pad + l).join("\n");
+  }
+  function table(el2) {
+    const rows = Array.from(el2.querySelectorAll("tr"));
+    if (!rows.length) return "";
+    const lines = [];
+    rows.forEach((row, ri) => {
+      const cells = Array.from(row.children).filter((c) => c.tagName === "TH" || c.tagName === "TD");
+      const texts = cells.map((c) => (c.textContent ?? "").trim().replace(/\|/g, "\\|"));
+      lines.push("| " + texts.join(" | ") + " |");
+      if (ri === 0) lines.push("| " + texts.map(() => "---").join(" | ") + " |");
+    });
+    return lines.join("\n");
+  }
+  function htmlToMarkdown(html) {
+    const doc = new DOMParser().parseFromString(html || "", "text/html");
+    const body = doc.body;
+    const out = blocks(body).trim().replace(/\n{3,}/g, "\n\n");
+    return out ? out + "\n" : "";
+  }
+
   // ts/card-modal.ts
   var currentCardId = null;
   var detail = null;
@@ -692,16 +899,35 @@
     const editor = el("div", { class: "cd-desc-editor", hidden: "true" });
     const ta = el("textarea", { class: "input", rows: "6", placeholder: "\u652F\u6301 Markdown\u2026" });
     ta.value = d.description || "";
+    const toolbar = el("div", { class: "wys-toolbar" });
+    const wys = el("div", { class: "wys-editor markdown-body", contenteditable: "true" });
+    buildWysToolbar(toolbar, wys);
     const tabs = el("div", { class: "editor-tabs" });
     const editTab = el("button", { class: "tab-btn active", type: "button", text: "\u7F16\u8F91" });
+    const wysTab = el("button", { class: "tab-btn", type: "button", text: "\u6240\u89C1\u5373\u6240\u5F97" });
     const prevTab = el("button", { class: "tab-btn", type: "button", text: "\u9884\u89C8" });
     const preview = el("div", { class: "markdown-body cd-desc-preview", hidden: "true" });
     const actions = el("div", { class: "modal-actions" });
     const save = el("button", { class: "btn btn-primary btn-sm", type: "button", text: "\u4FDD\u5B58" });
     const cancel = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "\u53D6\u6D88" });
+    let mode = "edit";
+    function setMode(m) {
+      mode = m;
+      editTab.classList.toggle("active", m === "edit");
+      wysTab.classList.toggle("active", m === "wysiwyg");
+      prevTab.classList.toggle("active", m === "preview");
+      ta.hidden = m !== "edit";
+      toolbar.hidden = m !== "wysiwyg";
+      wys.hidden = m !== "wysiwyg";
+      preview.hidden = m !== "preview";
+    }
+    function currentMarkdown() {
+      return mode === "wysiwyg" ? htmlToMarkdown(wys.innerHTML) : ta.value;
+    }
     function showEditor() {
       view.hidden = true;
       editor.hidden = false;
+      setMode("edit");
       ta.focus();
     }
     function hideEditor() {
@@ -709,25 +935,30 @@
       editor.hidden = true;
     }
     editTab.addEventListener("click", () => {
-      editTab.classList.add("active");
-      prevTab.classList.remove("active");
-      ta.hidden = false;
-      preview.hidden = true;
+      if (mode === "wysiwyg") ta.value = htmlToMarkdown(wys.innerHTML);
+      setMode("edit");
+    });
+    wysTab.addEventListener("click", async () => {
+      if (mode !== "wysiwyg") {
+        const md = ta.value.trim();
+        wys.innerHTML = md ? await mdToHtml(md) : "<p><br></p>";
+      }
+      setMode("wysiwyg");
+      wys.focus();
     });
     prevTab.addEventListener("click", async () => {
-      prevTab.classList.add("active");
-      editTab.classList.remove("active");
-      preview.hidden = false;
-      ta.hidden = true;
+      if (mode === "wysiwyg") ta.value = htmlToMarkdown(wys.innerHTML);
       preview.innerHTML = '<div class="loading">\u9884\u89C8\u4E2D\u2026</div>';
       preview.innerHTML = await mdToHtml(ta.value);
+      setMode("preview");
     });
     save.addEventListener("click", async () => {
       save.disabled = true;
       try {
-        const v = ta.value;
+        const v = currentMarkdown();
         await patchCard({ description: v });
         d.description = v;
+        ta.value = v;
         view.innerHTML = await mdToHtml(v);
         hideEditor();
         toast("\u63CF\u8FF0\u5DF2\u4FDD\u5B58", "success");
@@ -738,10 +969,57 @@
     });
     cancel.addEventListener("click", hideEditor);
     actions.append(save, cancel);
-    tabs.append(editTab, prevTab);
-    editor.append(tabs, ta, preview, actions);
+    tabs.append(editTab, wysTab, prevTab);
+    editor.append(tabs, ta, toolbar, wys, preview, actions);
     sec.append(view, editor);
     return sec;
+  }
+  function buildWysToolbar(toolbar, wys) {
+    function btn(title, text, onClick) {
+      const b = el("button", { class: "wys-btn", type: "button", title, text });
+      b.addEventListener("mousedown", (e) => e.preventDefault());
+      b.addEventListener("click", onClick);
+      return b;
+    }
+    function exec(cmd, value) {
+      wys.focus();
+      document.execCommand(cmd, false, value);
+    }
+    toolbar.append(
+      btn("\u52A0\u7C97", "B", () => exec("bold")),
+      btn("\u659C\u4F53", "I", () => exec("italic")),
+      btn("\u6807\u9898 1", "H1", () => exec("formatBlock", "h1")),
+      btn("\u6807\u9898 2", "H2", () => exec("formatBlock", "h2")),
+      btn("\u6807\u9898 3", "H3", () => exec("formatBlock", "h3")),
+      btn("\u65E0\u5E8F\u5217\u8868", "\u2022\u2261", () => exec("insertUnorderedList")),
+      btn("\u6709\u5E8F\u5217\u8868", "1\u2261", () => exec("insertOrderedList")),
+      btn("\u5F15\u7528", "\u275D", () => exec("formatBlock", "blockquote")),
+      btn("\u884C\u5185\u4EE3\u7801", "<>", () => {
+        wys.focus();
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+        const range = sel.getRangeAt(0);
+        try {
+          const code = document.createElement("code");
+          code.appendChild(range.extractContents());
+          range.insertNode(code);
+        } catch {
+        }
+      }),
+      btn("\u94FE\u63A5", "\u{1F517}", () => {
+        wys.focus();
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) return;
+        const range = sel.getRangeAt(0).cloneRange();
+        const url = window.prompt("\u94FE\u63A5\u5730\u5740", "https://");
+        if (!url) return;
+        wys.focus();
+        const sel2 = window.getSelection();
+        sel2?.removeAllRanges();
+        sel2?.addRange(range);
+        document.execCommand("createLink", false, url);
+      })
+    );
   }
   function buildSidebar(d) {
     const aside = el("aside", { class: "cd-sidebar" });
@@ -962,9 +1240,9 @@
   function buildComments(d) {
     const sec = el("section", { class: "cd-section" });
     sec.append(el("h4", { class: "cd-section-title", text: `\u8BC4\u8BBA\uFF08${d.comments.length}\uFF09` }));
-    const list = el("div", { class: "comment-list" });
-    for (const c of d.comments) list.append(buildCommentRow(c));
-    sec.append(list);
+    const list2 = el("div", { class: "comment-list" });
+    for (const c of d.comments) list2.append(buildCommentRow(c));
+    sec.append(list2);
     const editor = el("div", { class: "comment-editor" });
     const ta = el("textarea", { class: "input", rows: "3", placeholder: "\u8F93\u5165\u8BC4\u8BBA\uFF0C\u652F\u6301 Markdown\uFF1B\u53EF\u76F4\u63A5\u7C98\u8D34\u56FE\u7247\u4E0A\u4F20" });
     ta.addEventListener("paste", async (e) => {
@@ -1028,7 +1306,7 @@
   function buildAttachments(d) {
     const sec = el("section", { class: "cd-section" });
     sec.append(el("h4", { class: "cd-section-title", text: `\u9644\u4EF6\uFF08${d.attachments.length}\uFF09` }));
-    const list = el("div", { class: "attach-list" });
+    const list2 = el("div", { class: "attach-list" });
     for (const a of d.attachments) {
       const row = el("div", { class: "attach-row" });
       const link = el("a", { class: "attach-name", href: `/api/attachments/${a.id}/download`, text: a.fileName });
@@ -1044,9 +1322,9 @@
         }
       });
       row.append(link, el("span", { class: "muted", text: fmtSize(a.fileSize) }), el("span", { class: "muted", text: a.uploaderName + " \xB7 " + timeAgo(a.createdAt) }), del);
-      list.append(row);
+      list2.append(row);
     }
-    sec.append(list);
+    sec.append(list2);
     const up = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "+ \u4E0A\u4F20\u9644\u4EF6" });
     const fileInput = el("input", { type: "file", hidden: "true" });
     up.addEventListener("click", () => fileInput.click());
@@ -1071,9 +1349,9 @@
   function buildGit(d) {
     const sec = el("section", { class: "cd-section" });
     sec.append(el("h4", { class: "cd-section-title", text: "Git \u5173\u8054" }));
-    const list = el("div", { class: "git-list" });
+    const list2 = el("div", { class: "git-list" });
     if (!d.gitCommits.length) {
-      list.append(el("p", { class: "muted", text: "\u6682\u65E0\u5173\u8054\u63D0\u4EA4\uFF08\u53EF\u901A\u8FC7 GitLab \u540C\u6B65\u5173\u8054\uFF09" }));
+      list2.append(el("p", { class: "muted", text: "\u6682\u65E0\u5173\u8054\u63D0\u4EA4\uFF08\u53EF\u901A\u8FC7 GitLab \u540C\u6B65\u5173\u8054\uFF09" }));
     }
     for (const g of d.gitCommits) {
       const row = el("div", { class: "git-row" });
@@ -1081,9 +1359,9 @@
       row.append(sha, el("span", { class: "git-msg", text: g.message }));
       row.append(el("span", { class: "muted", text: g.authorName + " \xB7 " + (g.committedAt ? timeAgo(g.committedAt) : "") }));
       if (g.mrUrl) row.append(el("a", { class: "git-mr", href: g.mrUrl, target: "_blank", rel: "noopener", text: "MR" }));
-      list.append(row);
+      list2.append(row);
     }
-    sec.append(list);
+    sec.append(list2);
     return sec;
   }
   var ACTION_LABELS = {
@@ -1097,8 +1375,8 @@
   function buildActivity(d) {
     const sec = el("section", { class: "cd-section" });
     sec.append(el("h4", { class: "cd-section-title", text: "\u6D3B\u52A8" }));
-    const list = el("div", { class: "activity-list" });
-    if (!d.activities.length) list.append(el("p", { class: "muted", text: "\u6682\u65E0\u6D3B\u52A8\u8BB0\u5F55" }));
+    const list2 = el("div", { class: "activity-list" });
+    if (!d.activities.length) list2.append(el("p", { class: "muted", text: "\u6682\u65E0\u6D3B\u52A8\u8BB0\u5F55" }));
     for (const a of d.activities) {
       const row = el("div", { class: "activity-row" });
       row.append(avatar({ id: a.userId ?? void 0, avatarPath: null, displayName: a.displayName, username: a.username }, "xs"));
@@ -1106,9 +1384,9 @@
       const verb = ACTION_LABELS[a.action] || a.action;
       row.append(el("span", { class: "activity-who", text: who }), el("span", { class: "activity-detail", text: `${verb} ${a.detail || ""}`.trim() }));
       row.append(el("span", { class: "muted", text: timeAgo(a.createdAt) }));
-      list.append(row);
+      list2.append(row);
     }
-    sec.append(list);
+    sec.append(list2);
     return sec;
   }
   function priorityBadge(p, size = "sm") {
@@ -1141,6 +1419,8 @@
       colorWrap.append(sw);
     }
     body.append(formField("\u56FE\u6807\u989C\u8272", colorWrap));
+    const iconTextInput = el("input", { class: "input", type: "text", placeholder: "\u7559\u7A7A\u9ED8\u8BA4\u53D6\u9879\u76EE\u540D\u524D\u4E24\u5B57", maxlength: "2" });
+    body.append(formField("\u56FE\u6807\u6587\u5B57\uFF081-2 \u5B57\uFF09", iconTextInput));
     const tplSelect = el("select", { class: "select" });
     const tpls = [
       ["", "\u6807\u51C6\uFF08\u5F85\u529E / \u5DF2\u5B8C\u6210\uFF09"],
@@ -1166,6 +1446,7 @@
       }
       ok.disabled = true;
       try {
+        const iconText = iconTextInput.value.trim();
         await api("/projects", {
           method: "POST",
           body: {
@@ -1173,6 +1454,7 @@
             name: n,
             description: descInput.value.trim(),
             icon_color: selected,
+            icon_text: iconText || void 0,
             template: tplSelect.value
           }
         });
@@ -1240,12 +1522,14 @@
   var boardEl = qs("#board");
   var boardId = Number(boardEl?.dataset.boardId || 0);
   var projectKey2 = boardEl?.dataset.projectKey || "";
+  var COLUMN_COLORS = ["#3B82F6", "#EF4444", "#F97316", "#EAB308", "#22C55E", "#06B6D4", "#8B5CF6", "#EC4899"];
   var data = null;
   var filterQ = "";
   var filterAssignee = "";
   var filterLabel = "";
   var filterPriority = "";
   var dragCardId = null;
+  var dragColId = null;
   var justDragged = false;
   var refreshTimer = null;
   function initBoard() {
@@ -1292,6 +1576,9 @@
     });
     void load();
     initSse();
+    document.addEventListener("click", () => {
+      qsa(".col-color-pop").forEach((p) => p.hidden = true);
+    });
     window.addEventListener("dodogo:card-changed", () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => void load(), 250);
@@ -1322,10 +1609,38 @@
     const cards = data.cards.filter((c) => c.columnId === col.id).sort((a, b) => a.position - b.position);
     const visible = cards.filter(matchFilters);
     const head = el("div", { class: "col-head" });
-    head.append(el("span", { class: "col-dot", style: `background:${col.color || "#3B82F6"}` }));
-    head.append(el("span", { class: "col-name", text: col.name }));
+    head.draggable = true;
+    const nameSpan = el("span", { class: "col-name", text: col.name });
+    nameSpan.title = "\u70B9\u51FB\u6539\u540D\uFF0C\u53EF\u62D6\u62FD\u6392\u5E8F";
+    head.append(nameSpan);
     head.append(el("span", { class: "col-count", text: `${visible.length}/${cards.length}${col.wipLimit > 0 ? ` \xB7 WIP ${col.wipLimit}` : ""}` }));
     const colActions = el("span", { class: "col-actions" });
+    const colorBtn = el("button", { class: "btn-icon", type: "button", title: "\u5217\u989C\u8272" });
+    colorBtn.textContent = "\u{1F3A8}";
+    const colorPop = el("div", { class: "col-color-pop", hidden: "true" });
+    for (const c of COLUMN_COLORS) {
+      const sw = el("button", {
+        class: "swatch" + (c === (col.color || COLUMN_COLORS[0]) ? " active" : ""),
+        type: "button",
+        style: `background:${c}`
+      });
+      sw.addEventListener("click", (e) => {
+        e.stopPropagation();
+        void applyColumnColor(col, c, colorPop);
+      });
+      colorPop.append(sw);
+    }
+    const custom = el("input", { type: "color", title: "\u81EA\u5B9A\u4E49\u989C\u8272" });
+    custom.value = /^#[0-9a-fA-F]{6}$/.test(col.color || "") ? col.color : COLUMN_COLORS[0];
+    custom.addEventListener("input", () => void applyColumnColor(col, custom.value, colorPop));
+    custom.addEventListener("click", (e) => e.stopPropagation());
+    colorPop.append(custom);
+    colorBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const willShow = colorPop.hidden;
+      qsa(".col-color-pop").forEach((p) => p.hidden = true);
+      colorPop.hidden = !willShow;
+    });
     const delBtn = el("button", { class: "btn-icon", type: "button", text: "\u2715", title: "\u5220\u9664\u5217" });
     delBtn.addEventListener("click", async () => {
       if (!await confirmDialog(`\u5220\u9664\u5217\u300C${col.name}\u300D\uFF1F\uFF08\u5217\u5185\u4E0D\u80FD\u6709\u5361\u7247\uFF09`, { danger: true })) return;
@@ -1336,8 +1651,14 @@
         toast(errMsg(e), "error");
       }
     });
-    colActions.append(delBtn);
-    head.append(colActions);
+    colActions.append(colorBtn, delBtn);
+    head.append(colActions, colorPop);
+    if (col.color) {
+      colEl.style.background = hexToRgba(col.color, 0.06);
+      head.style.background = hexToRgba(col.color, 0.16);
+    }
+    nameSpan.addEventListener("click", () => startColumnRename(head, nameSpan, col));
+    setupColumnDrag(head, col);
     const body = el("div", { class: "col-cards", "data-col-body": String(col.id) });
     for (const card of cards) {
       const node = buildCard(card);
@@ -1350,12 +1671,142 @@
     colEl.append(head, body, foot);
     return colEl;
   }
+  function startColumnRename(head, nameSpan, col) {
+    const input = el("input", { class: "input input-sm col-name-input", type: "text", maxlength: "30" });
+    input.value = col.name;
+    head.replaceChild(input, nameSpan);
+    input.focus();
+    input.select();
+    let done = false;
+    const finish = async (commit) => {
+      if (done) return;
+      done = true;
+      const v = input.value.trim();
+      if (!commit || !v || v === col.name) {
+        if (!input.isConnected) return;
+        head.replaceChild(nameSpan, input);
+        return;
+      }
+      try {
+        await patchColumn(col, { name: v });
+        toast("\u5217\u540D\u5DF2\u66F4\u65B0", "success");
+      } catch (e) {
+        toast(errMsg(e), "error");
+        if (input.isConnected) head.replaceChild(nameSpan, input);
+      }
+    };
+    input.addEventListener("blur", () => void finish(true));
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        void finish(true);
+      } else if (e.key === "Escape") {
+        void finish(false);
+      }
+    });
+  }
+  async function applyColumnColor(col, color, pop) {
+    pop.hidden = true;
+    try {
+      await patchColumn(col, { color });
+      toast("\u5217\u989C\u8272\u5DF2\u66F4\u65B0", "success");
+    } catch (e) {
+      toast(errMsg(e), "error");
+    }
+  }
+  async function patchColumn(col, patch) {
+    await api(`/columns/${col.id}`, {
+      method: "PATCH",
+      body: {
+        name: patch.name ?? col.name,
+        color: patch.color ?? col.color,
+        wip_limit: patch.wipLimit ?? col.wipLimit,
+        is_done: patch.isDone ?? col.isDone
+      }
+    });
+    await load();
+  }
+  function setupColumnDrag(head, col) {
+    head.addEventListener("dragstart", (e) => {
+      const t = e.target;
+      if (t.closest("button, input, .col-color-pop")) {
+        e.preventDefault();
+        return;
+      }
+      dragColId = col.id;
+      head.classList.add("col-dragging");
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", String(col.id));
+      }
+    });
+    head.addEventListener("dragend", () => {
+      dragColId = null;
+      qsa(".col-head.col-dragging").forEach((h) => h.classList.remove("col-dragging"));
+      clearColumnIndicators();
+    });
+    head.addEventListener("dragover", (e) => {
+      if (dragColId == null || dragColId === col.id) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+      clearColumnIndicators();
+      const r = head.getBoundingClientRect();
+      head.classList.add(e.clientX < r.left + r.width / 2 ? "col-drop-before" : "col-drop-after");
+    });
+    head.addEventListener("dragleave", () => {
+      head.classList.remove("col-drop-before", "col-drop-after");
+    });
+    head.addEventListener("drop", (e) => {
+      if (dragColId == null || dragColId === col.id) return;
+      e.preventDefault();
+      const before = head.classList.contains("col-drop-before");
+      clearColumnIndicators();
+      const cols = [...data.columns].sort((a, b) => a.position - b.position);
+      const targetIdx = cols.findIndex((c) => c.id === col.id);
+      const position = before ? targetIdx : targetIdx + 1;
+      void moveColumn(dragColId, position);
+    });
+  }
+  function clearColumnIndicators() {
+    qsa(".col-head.col-drop-before, .col-head.col-drop-after").forEach((h) => h.classList.remove("col-drop-before", "col-drop-after"));
+  }
+  async function moveColumn(columnId, targetIndex) {
+    if (!data) return;
+    const cols = [...data.columns].sort((a, b) => a.position - b.position);
+    const idx = cols.findIndex((c) => c.id === columnId);
+    if (idx < 0) return;
+    const [moved] = cols.splice(idx, 1);
+    const insert = Math.max(0, Math.min(targetIndex, cols.length));
+    cols.splice(insert, 0, moved);
+    cols.forEach((c, i) => {
+      c.position = i;
+    });
+    data.columns = cols;
+    render();
+    try {
+      await api(`/columns/${columnId}/move`, { method: "POST", body: { position: insert } });
+      await load();
+    } catch (e) {
+      await load();
+      toast(errMsg(e), "error");
+    }
+  }
   function buildCard(card) {
     const node = el("div", { class: "card", draggable: "true", "data-card": String(card.id) });
     const cardLabels = data.labels.filter((l) => card.labelIds.includes(l.id));
+    if (card.coverUrl) {
+      const cover = el("div", { class: "card-cover" });
+      const img = el("img", { class: "card-cover-img", alt: "", loading: "lazy" });
+      img.src = card.coverUrl;
+      cover.append(img);
+      node.append(cover);
+    }
     const top = el("div", { class: "card-top" });
     top.append(el("span", { class: "card-no muted", text: card.number }), priorityBadge(card.priority));
     const title = el("div", { class: "card-title", text: card.title });
+    const chips = el("div", { class: "card-chips" });
+    if (card.milestoneName) chips.append(el("span", { class: "chip chip-milestone", text: "\u25C6 " + card.milestoneName }));
+    if (card.versionName) chips.append(el("span", { class: "chip chip-version", text: "\u{1F3F7} " + card.versionName }));
     const meta = el("div", { class: "card-meta" });
     const left = el("div", { class: "card-labels" });
     for (const l of cardLabels) {
@@ -1373,7 +1824,8 @@
       right.append(avatar(card.assignee, "sm"));
     }
     meta.append(left, right);
-    node.append(top, title, meta);
+    if (chips.children.length) node.append(top, title, chips, meta);
+    else node.append(top, title, meta);
     node.addEventListener("click", (e) => {
       if (justDragged) return;
       if (e.target.closest("button, a, select, input")) return;
@@ -1645,13 +2097,14 @@
     listEl.innerHTML = "";
     const grid = el("div", { class: "meta-grid" });
     for (const m of items) {
-      const card = el("div", { class: "card meta-card" });
+      const card = el("div", { class: "card meta-card meta-card-clickable" });
+      card.addEventListener("click", () => void openDetailModal(kind, m));
       const head = el("div", { class: "meta-card-head" });
       const color = m.color || "#3B82F6";
       head.append(el("span", { class: "col-dot", style: `background:${color}` }));
       head.append(el("span", { class: "meta-card-name", text: m.name }));
       const status = statusLabel(kind, m.status);
-      head.append(el("span", { class: "tag", style: `background:${hexToRgba(statusColor(status), 0.15)};color:${statusColor(status)}`, text: status }));
+      head.append(el("span", { class: "tag", style: `background:${hexToRgba(statusColor(m.status), 0.15)};color:${statusColor(m.status)}`, text: status }));
       card.append(head);
       if (m.description) card.append(el("p", { class: "muted meta-card-desc", text: m.description }));
       const dates = [];
@@ -1670,16 +2123,20 @@
       card.append(prog);
       const ops = el("div", { class: "meta-card-ops" });
       const editBtn = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "\u7F16\u8F91" });
-      editBtn.addEventListener("click", () => openEditModal(kind, m, reload));
+      editBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openEditModal(kind, m, reload);
+      });
       const delBtn = el("button", { class: "btn btn-ghost btn-sm btn-danger-text", type: "button", text: "\u5220\u9664" });
-      delBtn.addEventListener("click", async () => {
+      delBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
         if (!await confirmDialog(`\u5220\u9664${kind === "milestones" ? "\u91CC\u7A0B\u7891" : "\u7248\u672C"}\u300C${m.name}\u300D\uFF1F`, { danger: true, okText: "\u5220\u9664" })) return;
         try {
           await api(`/${kind === "milestones" ? "milestones" : "releases"}/${m.id}`, { method: "DELETE" });
           toast("\u5DF2\u5220\u9664", "success");
           await reload();
-        } catch (e) {
-          toast(errMsg(e), "error");
+        } catch (e2) {
+          toast(errMsg(e2), "error");
         }
       });
       ops.append(editBtn, delBtn);
@@ -1769,6 +2226,65 @@
     openModal({ title: item ? "\u7F16\u8F91" : `\u65B0\u5EFA${isMs ? "\u91CC\u7A0B\u7891" : "\u7248\u672C"}`, body, footer: foot, width: "480px" });
     nameInput.focus();
   }
+  async function openDetailModal(kind, item) {
+    const isMs = kind === "milestones";
+    const body = el("div", { class: "meta-detail" });
+    body.innerHTML = '<div class="loading">\u52A0\u8F7D\u4E2D\u2026</div>';
+    openModal({ title: item.name, body, width: "640px" });
+    try {
+      const d = await api(`/${isMs ? "milestones" : "releases"}/${item.id}`);
+      renderDetail2(body, d, kind);
+    } catch (e) {
+      body.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`;
+    }
+  }
+  function renderDetail2(body, d, kind) {
+    const isMs = kind === "milestones";
+    body.innerHTML = "";
+    const ms = d;
+    const ver = d;
+    const color = (isMs ? ms.color : "#3B82F6") || "#3B82F6";
+    const head = el("div", { class: "meta-detail-head" });
+    const colorBar = el("span", { class: "meta-detail-color", style: `background:${color}` });
+    const status = statusLabel(kind, d.status);
+    head.append(
+      colorBar,
+      el("span", { class: "tag", style: `background:${hexToRgba(statusColor(d.status), 0.15)};color:${statusColor(d.status)}`, text: status })
+    );
+    body.append(head);
+    if (d.description) body.append(el("p", { class: "meta-detail-desc", text: d.description }));
+    const dates = [];
+    if (isMs) {
+      if (ms.startDate) dates.push("\u5F00\u59CB " + fmtDate(ms.startDate));
+      if (ms.dueDate) dates.push("\u622A\u6B62 " + fmtDate(ms.dueDate));
+    } else {
+      if (ver.releaseDate) dates.push("\u53D1\u5E03\u65E5\u671F " + fmtDate(ver.releaseDate));
+    }
+    if (dates.length) body.append(el("p", { class: "muted meta-detail-dates", text: dates.join(" \xB7 ") }));
+    const pct = d.percent || 0;
+    const bar = el("div", { class: "progress" });
+    bar.append(el("div", { class: "progress-fill", style: `width:${pct}%` }));
+    const prog = el("div", { class: "meta-detail-progress" });
+    prog.append(bar, el("span", { class: "muted", text: `${d.doneCards}/${d.totalCards} \u5361\u7247 \xB7 ${pct}%` }));
+    body.append(prog);
+    body.append(el("h4", { class: "meta-detail-cards-title", text: `\u5173\u8054\u5361\u7247\uFF08${d.cards.length}\uFF09` }));
+    const list2 = el("div", { class: "meta-card-list" });
+    if (!d.cards.length) list2.append(el("p", { class: "muted", text: "\u6682\u65E0\u5173\u8054\u5361\u7247" }));
+    for (const c of d.cards) list2.append(buildDetailCardRow(c));
+    body.append(list2);
+  }
+  function buildDetailCardRow(c) {
+    const row = el("div", { class: "meta-card-row" });
+    row.append(el("span", { class: "muted meta-card-row-no", text: c.number }));
+    row.append(el("span", { class: "meta-card-row-title", text: c.title }));
+    row.append(el("span", { class: "muted meta-card-row-col", text: c.columnName || "" }));
+    const done = el("span", { class: "meta-card-row-done" + (c.done ? " is-done" : ""), text: c.done ? "\u2713 \u5DF2\u5B8C\u6210" : "\u672A\u5B8C\u6210" });
+    row.append(done);
+    row.append(priorityBadge(c.priority));
+    if (c.dueDate) row.append(el("span", { class: "muted meta-card-row-due", text: fmtDate(c.dueDate) }));
+    row.addEventListener("click", () => void openCardDetail(c.id));
+    return row;
+  }
 
   // ts/members.ts
   var ROLE_OPTIONS = [
@@ -1799,12 +2315,12 @@
       return;
     }
     listEl.innerHTML = "";
-    const table = el("table", { class: "table" });
+    const table2 = el("table", { class: "table" });
     const thead = el("thead");
     thead.append(el("tr"));
     const heads = ["\u6210\u5458", "\u89D2\u8272", "\u52A0\u5165\u65F6\u95F4", "\u64CD\u4F5C"];
     for (const h of heads) thead.querySelector("tr").append(el("th", { text: h }));
-    table.append(thead);
+    table2.append(thead);
     const tbody = el("tbody");
     for (const m of members2) {
       const tr = el("tr");
@@ -1856,8 +2372,8 @@
       tr.append(opTd);
       tbody.append(tr);
     }
-    table.append(tbody);
-    listEl.append(table);
+    table2.append(tbody);
+    listEl.append(table2);
   }
   function openAddModal(projectKey3, reload) {
     const body = el("div", { class: "form-stack" });
@@ -1895,6 +2411,51 @@
     identityInput.focus();
   }
 
+  // ts/project-icon.ts
+  function projectIcon(p, size = "md") {
+    const cls = "project-icon" + (size === "sm" ? " project-icon-sm" : size === "lg" ? " project-icon-lg" : "");
+    const text = p.iconText && p.iconText.trim() || initialsOf(p.name);
+    const wrap = el("span", { class: cls, text });
+    wrap.style.background = p.iconColor || "#3B82F6";
+    if (p.iconPath) {
+      const img = el("img", { class: "project-icon-img", alt: p.name });
+      img.src = `/api/project-icons/${p.id}`;
+      img.addEventListener("error", () => img.remove());
+      wrap.append(img);
+    }
+    return wrap;
+  }
+  async function initProjectIcons() {
+    const page = document.body.dataset.page || "";
+    const projectKey3 = document.body.dataset.projectKey || "";
+    if (projectKey3) {
+      const headIcon = qs(".project-head .project-icon");
+      if (headIcon) {
+        try {
+          const p = await api(`/projects/${projectKey3}`);
+          headIcon.replaceWith(projectIcon(p, "lg"));
+        } catch {
+        }
+      }
+    }
+    if (page === "home") {
+      const cards = qsa(".project-card");
+      if (!cards.length) return;
+      try {
+        const projects = await api("/projects");
+        const byKey = new Map(projects.map((p) => [p.key, p]));
+        for (const card of cards) {
+          const key = card.dataset.projectKey;
+          const p = key ? byKey.get(key) : void 0;
+          if (!p) continue;
+          const icon = qs(".project-icon", card);
+          if (icon) icon.replaceWith(projectIcon(p, "md"));
+        }
+      } catch {
+      }
+    }
+  }
+
   // ts/settings.ts
   var ICON_COLORS2 = ["#3B82F6", "#EF4444", "#F97316", "#EAB308", "#22C55E", "#06B6D4", "#8B5CF6", "#EC4899"];
   function initSettings() {
@@ -1924,12 +2485,54 @@
       return;
     }
     const card = el("div", { class: "card settings-card" });
+    const iconRow = el("div", { class: "settings-icon-row" });
+    const iconPreview = el("div", { class: "settings-icon-preview" });
+    iconPreview.append(projectIcon(p, "lg"));
+    iconRow.append(iconPreview);
+    const iconActions = el("div", { class: "settings-icon-actions" });
+    const upBtn = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "\u4E0A\u4F20\u56FE\u7247\u56FE\u6807" });
+    const fileInput = el("input", { type: "file", accept: "image/*", hidden: "true" });
+    upBtn.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", async () => {
+      const f = fileInput.files?.[0];
+      if (!f) return;
+      try {
+        const fd = new FormData();
+        fd.append("file", f);
+        await api(`/projects/${projectKey3}/icon`, { method: "POST", form: fd });
+        toast("\u56FE\u6807\u5DF2\u4E0A\u4F20", "success");
+        setTimeout(() => location.reload(), 500);
+      } catch (e) {
+        toast(errMsg(e), "error");
+      }
+      fileInput.value = "";
+    });
+    iconActions.append(upBtn);
+    if (p.iconPath) {
+      const removeBtn = el("button", { class: "btn btn-ghost btn-sm btn-danger-text", type: "button", text: "\u79FB\u9664\u56FE\u7247\uFF0C\u5207\u56DE\u8272\u5757" });
+      removeBtn.addEventListener("click", async () => {
+        if (!await confirmDialog("\u79FB\u9664\u56FE\u7247\u56FE\u6807\uFF0C\u5207\u6362\u56DE\u8272\u5757 + \u6587\u5B57\u6A21\u5F0F\uFF1F")) return;
+        try {
+          await api(`/projects/${projectKey3}/icon`, { method: "DELETE" });
+          toast("\u5DF2\u5207\u56DE\u8272\u5757\u6A21\u5F0F", "success");
+          setTimeout(() => location.reload(), 500);
+        } catch (e) {
+          toast("\u79FB\u9664\u56FE\u6807\u5931\u8D25\uFF08\u540E\u7AEF\u6682\u672A\u63D0\u4F9B\u8BE5\u63A5\u53E3\uFF09\uFF1A" + errMsg(e), "error");
+        }
+      });
+      iconActions.append(removeBtn);
+    }
+    iconRow.append(iconActions);
+    card.append(formField("\u9879\u76EE\u56FE\u6807", iconRow));
     const nameInput = el("input", { class: "input", type: "text", maxlength: "60" });
     nameInput.value = p.name;
     card.append(formField("\u9879\u76EE\u540D\u79F0", nameInput));
     const descInput = el("textarea", { class: "input", rows: "3" });
     descInput.value = p.description || "";
     card.append(formField("\u9879\u76EE\u63CF\u8FF0", descInput));
+    const iconTextInput = el("input", { class: "input", type: "text", maxlength: "2", placeholder: "1-2 \u5B57\uFF0C\u7559\u7A7A\u53D6\u9879\u76EE\u540D\u524D\u4E24\u5B57" });
+    iconTextInput.value = p.iconText || initialsOf(p.name);
+    card.append(formField("\u56FE\u6807\u6587\u5B57\uFF081-2 \u5B57\uFF09", iconTextInput));
     const colorWrap = el("div", { class: "color-swatches" });
     let selected = ICON_COLORS2.includes(p.iconColor) ? p.iconColor : ICON_COLORS2[0];
     for (const c of ICON_COLORS2) {
@@ -1953,7 +2556,12 @@
       try {
         await api(`/projects/${projectKey3}`, {
           method: "PATCH",
-          body: { name, description: descInput.value.trim(), icon_color: selected }
+          body: {
+            name,
+            description: descInput.value.trim(),
+            icon_color: selected,
+            icon_text: iconTextInput.value.trim()
+          }
         });
         toast("\u5DF2\u4FDD\u5B58", "success");
         setTimeout(() => location.reload(), 500);
@@ -2129,7 +2737,7 @@
       return;
     }
     box.innerHTML = "";
-    const list = el("div", { class: "search-results-list" });
+    const list2 = el("div", { class: "search-results-list" });
     for (const it of items) {
       const row = el("div", { class: "search-row" });
       const main = el("div", { class: "search-row-main" });
@@ -2142,9 +2750,9 @@
       row.append(main);
       if (it.updatedAt) row.append(el("span", { class: "muted", text: timeAgo(it.updatedAt) }));
       row.addEventListener("click", () => void openCardDetail(it.id));
-      list.append(row);
+      list2.append(row);
     }
-    box.append(list);
+    box.append(list2);
   }
 
   // ts/notifications.ts
@@ -2191,7 +2799,7 @@
       return;
     }
     box.innerHTML = "";
-    const list = el("div", { class: "notif-list-inner" });
+    const list2 = el("div", { class: "notif-list-inner" });
     for (const n of items) {
       const row = el("div", { class: "notif-row" + (n.read ? "" : " unread") });
       const dot = el("span", { class: "notif-dot" });
@@ -2217,9 +2825,9 @@
           location.href = n.link;
         }
       });
-      list.append(row);
+      list2.append(row);
     }
-    box.append(list);
+    box.append(list2);
   }
 
   // ts/admin.ts
@@ -2260,20 +2868,20 @@
     const backupBox = el("div", { class: "card" });
     const loadBackups = async () => {
       try {
-        const list = await api("/admin/backups");
+        const list2 = await api("/admin/backups");
         backupBox.innerHTML = "";
-        const table = el("table", { class: "table" });
+        const table2 = el("table", { class: "table" });
         const thead = el("thead");
         thead.append(el("tr"));
         for (const h of ["\u6587\u4EF6\u540D", "\u5927\u5C0F", "\u521B\u5EFA\u65F6\u95F4", "\u64CD\u4F5C"]) thead.querySelector("tr").append(el("th", { text: h }));
-        table.append(thead);
+        table2.append(thead);
         const tbody = el("tbody");
-        if (!list.length) {
+        if (!list2.length) {
           const tr = el("tr");
           tr.append(el("td", { colspan: "4", class: "muted", text: "\u6682\u65E0\u5907\u4EFD" }));
           tbody.append(tr);
         }
-        for (const b of list) {
+        for (const b of list2) {
           const tr = el("tr");
           tr.append(el("td", { text: b.name }));
           tr.append(el("td", { class: "muted", text: fmtSize(b.size) }));
@@ -2294,8 +2902,8 @@
           tr.append(op);
           tbody.append(tr);
         }
-        table.append(tbody);
-        backupBox.append(table);
+        table2.append(tbody);
+        backupBox.append(table2);
       } catch (e) {
         backupBox.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`;
       }
@@ -2336,11 +2944,11 @@
         });
         bar.append(qInput, el("span", { class: "muted", text: `\u5171 ${d.total} \u4E2A\u7528\u6237` }));
         content.append(bar);
-        const table = el("table", { class: "table" });
+        const table2 = el("table", { class: "table" });
         const thead = el("thead");
         thead.append(el("tr"));
         for (const h of ["\u7528\u6237", "\u89D2\u8272", "\u72B6\u6001", "\u6CE8\u518C\u65F6\u95F4", "\u64CD\u4F5C"]) thead.querySelector("tr").append(el("th", { text: h }));
-        table.append(thead);
+        table2.append(thead);
         const tbody = el("tbody");
         for (const u of d.items) {
           const tr = el("tr");
@@ -2417,8 +3025,8 @@
           tr.append(opTd);
           tbody.append(tr);
         }
-        table.append(tbody);
-        content.append(table);
+        table2.append(tbody);
+        content.append(table2);
         const pager = el("div", { class: "pager" });
         const prev = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "\u4E0A\u4E00\u9875" });
         prev.disabled = page <= 1;
@@ -2529,11 +3137,11 @@
       try {
         const items = await api(`/admin/audit-logs?page=${page}&page_size=30`);
         content.innerHTML = "";
-        const table = el("table", { class: "table" });
+        const table2 = el("table", { class: "table" });
         const thead = el("thead");
         thead.append(el("tr"));
         for (const h of ["\u65F6\u95F4", "\u7528\u6237", "\u64CD\u4F5C", "\u5BF9\u8C61", "IP"]) thead.querySelector("tr").append(el("th", { text: h }));
-        table.append(thead);
+        table2.append(thead);
         const tbody = el("tbody");
         if (!items.length) {
           const tr = el("tr");
@@ -2549,8 +3157,8 @@
           tr.append(el("td", { class: "muted", text: it.ip || "-" }));
           tbody.append(tr);
         }
-        table.append(tbody);
-        content.append(table);
+        table2.append(tbody);
+        content.append(table2);
         const pager = el("div", { class: "pager" });
         const prev = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "\u4E0A\u4E00\u9875" });
         prev.disabled = page <= 1;
@@ -2582,6 +3190,7 @@
     }
     if (page === "error") return;
     initTopbar();
+    void initProjectIcons();
     switch (page) {
       case "home":
         initHome();

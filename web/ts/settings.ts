@@ -1,9 +1,10 @@
 // 项目设置页：基本信息（PATCH/归档/删除）+ GitLab 集成（GET/PUT/sync/test）
 
 import { api, errMsg } from './api';
-import { el, qs, qsa, esc, formField } from './util';
+import { el, qs, qsa, esc, formField, initialsOf } from './util';
 import { toast } from './toast';
 import { confirmDialog, promptDialog } from './modal';
+import { projectIcon } from './project-icon';
 import type { ProjectDto } from './types';
 
 const ICON_COLORS = ['#3B82F6', '#EF4444', '#F97316', '#EAB308', '#22C55E', '#06B6D4', '#8B5CF6', '#EC4899'];
@@ -54,6 +55,50 @@ async function loadBasic(projectKey: string): Promise<void> {
   }
 
   const card = el('div', { class: 'card settings-card' });
+
+  // 项目图标：预览 + 上传图片 / 移除图片
+  const iconRow = el('div', { class: 'settings-icon-row' });
+  const iconPreview = el('div', { class: 'settings-icon-preview' });
+  iconPreview.append(projectIcon(p, 'lg'));
+  iconRow.append(iconPreview);
+
+  const iconActions = el('div', { class: 'settings-icon-actions' });
+  const upBtn = el('button', { class: 'btn btn-ghost btn-sm', type: 'button', text: '上传图片图标' });
+  const fileInput = el('input', { type: 'file', accept: 'image/*', hidden: 'true' });
+  upBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async () => {
+    const f = fileInput.files?.[0];
+    if (!f) return;
+    try {
+      const fd = new FormData();
+      fd.append('file', f);
+      await api<{ iconPath: string }>(`/projects/${projectKey}/icon`, { method: 'POST', form: fd });
+      toast('图标已上传', 'success');
+      setTimeout(() => location.reload(), 500);
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    }
+    fileInput.value = '';
+  });
+  iconActions.append(upBtn);
+
+  if (p.iconPath) {
+    const removeBtn = el('button', { class: 'btn btn-ghost btn-sm btn-danger-text', type: 'button', text: '移除图片，切回色块' });
+    removeBtn.addEventListener('click', async () => {
+      if (!(await confirmDialog('移除图片图标，切换回色块 + 文字模式？'))) return;
+      try {
+        await api(`/projects/${projectKey}/icon`, { method: 'DELETE' });
+        toast('已切回色块模式', 'success');
+        setTimeout(() => location.reload(), 500);
+      } catch (e) {
+        toast('移除图标失败（后端暂未提供该接口）：' + errMsg(e), 'error');
+      }
+    });
+    iconActions.append(removeBtn);
+  }
+  iconRow.append(iconActions);
+  card.append(formField('项目图标', iconRow));
+
   const nameInput = el('input', { class: 'input', type: 'text', maxlength: '60' });
   nameInput.value = p.name;
   card.append(formField('项目名称', nameInput));
@@ -61,6 +106,10 @@ async function loadBasic(projectKey: string): Promise<void> {
   const descInput = el('textarea', { class: 'input', rows: '3' });
   descInput.value = p.description || '';
   card.append(formField('项目描述', descInput));
+
+  const iconTextInput = el('input', { class: 'input', type: 'text', maxlength: '2', placeholder: '1-2 字，留空取项目名前两字' });
+  iconTextInput.value = p.iconText || initialsOf(p.name);
+  card.append(formField('图标文字（1-2 字）', iconTextInput));
 
   const colorWrap = el('div', { class: 'color-swatches' });
   let selected = ICON_COLORS.includes(p.iconColor) ? p.iconColor : ICON_COLORS[0];
@@ -86,7 +135,12 @@ async function loadBasic(projectKey: string): Promise<void> {
     try {
       await api(`/projects/${projectKey}`, {
         method: 'PATCH',
-        body: { name, description: descInput.value.trim(), icon_color: selected },
+        body: {
+          name,
+          description: descInput.value.trim(),
+          icon_color: selected,
+          icon_text: iconTextInput.value.trim(),
+        },
       });
       toast('已保存', 'success');
       setTimeout(() => location.reload(), 500);

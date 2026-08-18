@@ -11,6 +11,7 @@ import { initSettings } from './settings';
 import { initSearch } from './search';
 import { initNotifications } from './notifications';
 import { initAdmin } from './admin';
+import { initProjectIcons } from './project-icon';
 
 function init(): void {
   initTheme();
@@ -22,6 +23,7 @@ function init(): void {
   if (page === 'error') return;
 
   initTopbar();
+  void initProjectIcons();
   switch (page) {
     case 'home':
       initHome();

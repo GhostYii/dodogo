@@ -4,6 +4,8 @@ import { api, errMsg } from './api';
 import { el, qs, esc, fmtDate, formField, hexToRgba } from './util';
 import { toast } from './toast';
 import { openModal, closeModal, confirmDialog } from './modal';
+import { openCardDetail, priorityBadge } from './card-modal';
+import type { MilestoneDetailDto, VersionDetailDto, MetaCardDto } from './types';
 
 type Kind = 'milestones' | 'releases';
 
@@ -65,13 +67,14 @@ function renderList(listEl: HTMLElement, items: MetaItem[], kind: Kind, reload: 
   listEl.innerHTML = '';
   const grid = el('div', { class: 'meta-grid' });
   for (const m of items) {
-    const card = el('div', { class: 'card meta-card' });
+    const card = el('div', { class: 'card meta-card meta-card-clickable' });
+    card.addEventListener('click', () => void openDetailModal(kind, m));
     const head = el('div', { class: 'meta-card-head' });
     const color = m.color || '#3B82F6';
     head.append(el('span', { class: 'col-dot', style: `background:${color}` }));
     head.append(el('span', { class: 'meta-card-name', text: m.name }));
     const status = statusLabel(kind, m.status);
-    head.append(el('span', { class: 'tag', style: `background:${hexToRgba(statusColor(status), 0.15)};color:${statusColor(status)}`, text: status }));
+    head.append(el('span', { class: 'tag', style: `background:${hexToRgba(statusColor(m.status), 0.15)};color:${statusColor(m.status)}`, text: status }));
     card.append(head);
 
     if (m.description) card.append(el('p', { class: 'muted meta-card-desc', text: m.description }));
@@ -94,16 +97,20 @@ function renderList(listEl: HTMLElement, items: MetaItem[], kind: Kind, reload: 
 
     const ops = el('div', { class: 'meta-card-ops' });
     const editBtn = el('button', { class: 'btn btn-ghost btn-sm', type: 'button', text: '编辑' });
-    editBtn.addEventListener('click', () => openEditModal(kind, m, reload));
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditModal(kind, m, reload);
+    });
     const delBtn = el('button', { class: 'btn btn-ghost btn-sm btn-danger-text', type: 'button', text: '删除' });
-    delBtn.addEventListener('click', async () => {
+    delBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
       if (!(await confirmDialog(`删除${kind === 'milestones' ? '里程碑' : '版本'}「${m.name}」？`, { danger: true, okText: '删除' }))) return;
       try {
         await api(`/${kind === 'milestones' ? 'milestones' : 'releases'}/${m.id}`, { method: 'DELETE' });
         toast('已删除', 'success');
         await reload();
-      } catch (e) {
-        toast(errMsg(e), 'error');
+      } catch (e2) {
+        toast(errMsg(e2), 'error');
       }
     });
     ops.append(editBtn, delBtn);
@@ -201,4 +208,73 @@ function openEditModal(kind: Kind, item: MetaItem | null, reload: () => Promise<
   foot.append(cancel, ok);
   openModal({ title: item ? '编辑' : `新建${isMs ? '里程碑' : '版本'}`, body, footer: foot, width: '480px' });
   nameInput.focus();
+}
+
+// ============ 详情弹窗 ============
+
+async function openDetailModal(kind: Kind, item: MetaItem): Promise<void> {
+  const isMs = kind === 'milestones';
+  const body = el('div', { class: 'meta-detail' });
+  body.innerHTML = '<div class="loading">加载中…</div>';
+  openModal({ title: item.name, body, width: '640px' });
+  try {
+    const d = await api<MilestoneDetailDto | VersionDetailDto>(`/${isMs ? 'milestones' : 'releases'}/${item.id}`);
+    renderDetail(body, d, kind);
+  } catch (e) {
+    body.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`;
+  }
+}
+
+function renderDetail(body: HTMLElement, d: MilestoneDetailDto | VersionDetailDto, kind: Kind): void {
+  const isMs = kind === 'milestones';
+  body.innerHTML = '';
+  const ms = d as MilestoneDetailDto;
+  const ver = d as VersionDetailDto;
+  const color = (isMs ? ms.color : '#3B82F6') || '#3B82F6';
+
+  const head = el('div', { class: 'meta-detail-head' });
+  const colorBar = el('span', { class: 'meta-detail-color', style: `background:${color}` });
+  const status = statusLabel(kind, d.status);
+  head.append(
+    colorBar,
+    el('span', { class: 'tag', style: `background:${hexToRgba(statusColor(d.status), 0.15)};color:${statusColor(d.status)}`, text: status }),
+  );
+  body.append(head);
+
+  if (d.description) body.append(el('p', { class: 'meta-detail-desc', text: d.description }));
+
+  const dates: string[] = [];
+  if (isMs) {
+    if (ms.startDate) dates.push('开始 ' + fmtDate(ms.startDate));
+    if (ms.dueDate) dates.push('截止 ' + fmtDate(ms.dueDate));
+  } else {
+    if (ver.releaseDate) dates.push('发布日期 ' + fmtDate(ver.releaseDate));
+  }
+  if (dates.length) body.append(el('p', { class: 'muted meta-detail-dates', text: dates.join(' · ') }));
+
+  const pct = d.percent || 0;
+  const bar = el('div', { class: 'progress' });
+  bar.append(el('div', { class: 'progress-fill', style: `width:${pct}%` }));
+  const prog = el('div', { class: 'meta-detail-progress' });
+  prog.append(bar, el('span', { class: 'muted', text: `${d.doneCards}/${d.totalCards} 卡片 · ${pct}%` }));
+  body.append(prog);
+
+  body.append(el('h4', { class: 'meta-detail-cards-title', text: `关联卡片（${d.cards.length}）` }));
+  const list = el('div', { class: 'meta-card-list' });
+  if (!d.cards.length) list.append(el('p', { class: 'muted', text: '暂无关联卡片' }));
+  for (const c of d.cards) list.append(buildDetailCardRow(c));
+  body.append(list);
+}
+
+function buildDetailCardRow(c: MetaCardDto): HTMLElement {
+  const row = el('div', { class: 'meta-card-row' });
+  row.append(el('span', { class: 'muted meta-card-row-no', text: c.number }));
+  row.append(el('span', { class: 'meta-card-row-title', text: c.title }));
+  row.append(el('span', { class: 'muted meta-card-row-col', text: c.columnName || '' }));
+  const done = el('span', { class: 'meta-card-row-done' + (c.done ? ' is-done' : ''), text: c.done ? '✓ 已完成' : '未完成' });
+  row.append(done);
+  row.append(priorityBadge(c.priority));
+  if (c.dueDate) row.append(el('span', { class: 'muted meta-card-row-due', text: fmtDate(c.dueDate) }));
+  row.addEventListener('click', () => void openCardDetail(c.id));
+  return row;
 }

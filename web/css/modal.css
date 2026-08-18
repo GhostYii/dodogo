@@ -102,6 +102,45 @@
 .editor-tabs { display: flex; gap: 4px; }
 .cd-desc-preview { border: 1px solid var(--border); border-radius: 6px; padding: 10px; min-height: 80px; }
 
+/* 所见即所得编辑器 */
+.wys-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.wys-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font);
+  cursor: pointer;
+}
+.wys-btn:hover { background: var(--surface); border-color: var(--border); }
+.wys-editor {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  min-height: 120px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--surface);
+  outline: none;
+}
+.wys-editor:focus { border-color: var(--primary); }
+.wys-editor blockquote { margin: 8px 0; padding: 4px 12px; border-left: 3px solid var(--primary); color: var(--text-2); }
+.wys-editor pre { background: var(--surface-2); border-radius: 6px; padding: 10px; overflow-x: auto; }
+.wys-editor code { background: var(--surface-2); border-radius: 4px; padding: 1px 5px; font-size: 13px; }
+.wys-editor a { color: var(--primary); }
+
 /* 侧栏 */
 .cd-sidebar { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; background: var(--bg); }
 .cd-sidebar .field { margin-bottom: 12px; }

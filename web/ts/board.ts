@@ -11,12 +11,15 @@ const boardEl = qs<HTMLElement>('#board');
 const boardId = Number(boardEl?.dataset.boardId || 0);
 const projectKey = boardEl?.dataset.projectKey || '';
 
+const COLUMN_COLORS = ['#3B82F6', '#EF4444', '#F97316', '#EAB308', '#22C55E', '#06B6D4', '#8B5CF6', '#EC4899'];
+
 let data: BoardFull | null = null;
 let filterQ = '';
 let filterAssignee = '';
 let filterLabel = '';
 let filterPriority = '';
 let dragCardId: number | null = null;
+let dragColId: number | null = null;
 let justDragged = false;
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -67,6 +70,10 @@ export function initBoard(): void {
 
   void load();
   initSse();
+  // 点击其它区域时收起列颜色选择面板
+  document.addEventListener('click', () => {
+    qsa<HTMLElement>('.col-color-pop').forEach((p) => (p.hidden = true));
+  });
   window.addEventListener('dodogo:card-changed', () => {
     if (refreshTimer) clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => void load(), 250);
@@ -106,10 +113,43 @@ function buildColumn(col: ColumnDto): HTMLElement {
   const visible = cards.filter(matchFilters);
 
   const head = el('div', { class: 'col-head' });
-  head.append(el('span', { class: 'col-dot', style: `background:${col.color || '#3B82F6'}` }));
-  head.append(el('span', { class: 'col-name', text: col.name }));
+  head.draggable = true;
+
+  const nameSpan = el('span', { class: 'col-name', text: col.name });
+  nameSpan.title = '点击改名，可拖拽排序';
+  head.append(nameSpan);
   head.append(el('span', { class: 'col-count', text: `${visible.length}/${cards.length}${col.wipLimit > 0 ? ` · WIP ${col.wipLimit}` : ''}` }));
+
   const colActions = el('span', { class: 'col-actions' });
+
+  // 颜色选择（复用 8 色板 + 自定义），选中后作为列头/列区域背景色
+  const colorBtn = el('button', { class: 'btn-icon', type: 'button', title: '列颜色' });
+  colorBtn.textContent = '🎨';
+  const colorPop = el('div', { class: 'col-color-pop', hidden: 'true' });
+  for (const c of COLUMN_COLORS) {
+    const sw = el('button', {
+      class: 'swatch' + (c === (col.color || COLUMN_COLORS[0]) ? ' active' : ''),
+      type: 'button',
+      style: `background:${c}`,
+    });
+    sw.addEventListener('click', (e) => {
+      e.stopPropagation();
+      void applyColumnColor(col, c, colorPop);
+    });
+    colorPop.append(sw);
+  }
+  const custom = el('input', { type: 'color', title: '自定义颜色' }) as HTMLInputElement;
+  custom.value = /^#[0-9a-fA-F]{6}$/.test(col.color || '') ? col.color : COLUMN_COLORS[0];
+  custom.addEventListener('input', () => void applyColumnColor(col, custom.value, colorPop));
+  custom.addEventListener('click', (e) => e.stopPropagation());
+  colorPop.append(custom);
+  colorBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const willShow = colorPop.hidden;
+    qsa<HTMLElement>('.col-color-pop').forEach((p) => (p.hidden = true));
+    colorPop.hidden = !willShow;
+  });
+
   const delBtn = el('button', { class: 'btn-icon', type: 'button', text: '✕', title: '删除列' });
   delBtn.addEventListener('click', async () => {
     if (!(await confirmDialog(`删除列「${col.name}」？（列内不能有卡片）`, { danger: true }))) return;
@@ -120,8 +160,19 @@ function buildColumn(col: ColumnDto): HTMLElement {
       toast(errMsg(e), 'error');
     }
   });
-  colActions.append(delBtn);
-  head.append(colActions);
+  colActions.append(colorBtn, delBtn);
+  head.append(colActions, colorPop);
+
+  // 列颜色 → 浅色背景（列头稍深，列区域更浅）
+  if (col.color) {
+    colEl.style.background = hexToRgba(col.color, 0.06);
+    head.style.background = hexToRgba(col.color, 0.16);
+  }
+
+  // 列名内联改名
+  nameSpan.addEventListener('click', () => startColumnRename(head, nameSpan, col));
+
+  setupColumnDrag(head, col);
 
   const body = el('div', { class: 'col-cards', 'data-col-body': String(col.id) });
   for (const card of cards) {
@@ -138,14 +189,159 @@ function buildColumn(col: ColumnDto): HTMLElement {
   return colEl;
 }
 
+/** 列内联改名。 */
+function startColumnRename(head: HTMLElement, nameSpan: HTMLElement, col: ColumnDto): void {
+  const input = el('input', { class: 'input input-sm col-name-input', type: 'text', maxlength: '30' });
+  input.value = col.name;
+  head.replaceChild(input, nameSpan);
+  input.focus();
+  input.select();
+  let done = false;
+  const finish = async (commit: boolean): Promise<void> => {
+    if (done) return;
+    done = true;
+    const v = input.value.trim();
+    if (!commit || !v || v === col.name) {
+      if (!input.isConnected) return;
+      head.replaceChild(nameSpan, input);
+      return;
+    }
+    try {
+      await patchColumn(col, { name: v });
+      toast('列名已更新', 'success');
+    } catch (e) {
+      toast(errMsg(e), 'error');
+      if (input.isConnected) head.replaceChild(nameSpan, input);
+    }
+  };
+  input.addEventListener('blur', () => void finish(true));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void finish(true);
+    } else if (e.key === 'Escape') {
+      void finish(false);
+    }
+  });
+}
+
+/** 列颜色变更（PATCH /columns/{id}）。 */
+async function applyColumnColor(col: ColumnDto, color: string, pop: HTMLElement): Promise<void> {
+  pop.hidden = true;
+  try {
+    await patchColumn(col, { color });
+    toast('列颜色已更新', 'success');
+  } catch (e) {
+    toast(errMsg(e), 'error');
+  }
+}
+
+/** 更新列：始终携带全部字段，避免后端把未传字段重置为默认值。 */
+async function patchColumn(col: ColumnDto, patch: Partial<Pick<ColumnDto, 'name' | 'color' | 'wipLimit' | 'isDone'>>): Promise<void> {
+  await api(`/columns/${col.id}`, {
+    method: 'PATCH',
+    body: {
+      name: patch.name ?? col.name,
+      color: patch.color ?? col.color,
+      wip_limit: patch.wipLimit ?? col.wipLimit,
+      is_done: patch.isDone ?? col.isDone,
+    },
+  });
+  await load();
+}
+
+// ============ 列拖拽排序 ============
+
+function setupColumnDrag(head: HTMLElement, col: ColumnDto): void {
+  head.addEventListener('dragstart', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.closest('button, input, .col-color-pop')) {
+      e.preventDefault();
+      return;
+    }
+    dragColId = col.id;
+    head.classList.add('col-dragging');
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(col.id));
+    }
+  });
+  head.addEventListener('dragend', () => {
+    dragColId = null;
+    qsa('.col-head.col-dragging').forEach((h) => h.classList.remove('col-dragging'));
+    clearColumnIndicators();
+  });
+  head.addEventListener('dragover', (e) => {
+    if (dragColId == null || dragColId === col.id) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    clearColumnIndicators();
+    const r = head.getBoundingClientRect();
+    head.classList.add(e.clientX < r.left + r.width / 2 ? 'col-drop-before' : 'col-drop-after');
+  });
+  head.addEventListener('dragleave', () => {
+    head.classList.remove('col-drop-before', 'col-drop-after');
+  });
+  head.addEventListener('drop', (e) => {
+    if (dragColId == null || dragColId === col.id) return;
+    e.preventDefault();
+    const before = head.classList.contains('col-drop-before');
+    clearColumnIndicators();
+    const cols = [...data!.columns].sort((a, b) => a.position - b.position);
+    const targetIdx = cols.findIndex((c) => c.id === col.id);
+    const position = before ? targetIdx : targetIdx + 1;
+    void moveColumn(dragColId, position);
+  });
+}
+
+function clearColumnIndicators(): void {
+  qsa('.col-head.col-drop-before, .col-head.col-drop-after').forEach((h) => h.classList.remove('col-drop-before', 'col-drop-after'));
+}
+
+async function moveColumn(columnId: number, targetIndex: number): Promise<void> {
+  if (!data) return;
+  const cols = [...data.columns].sort((a, b) => a.position - b.position);
+  const idx = cols.findIndex((c) => c.id === columnId);
+  if (idx < 0) return;
+  const [moved] = cols.splice(idx, 1);
+  const insert = Math.max(0, Math.min(targetIndex, cols.length));
+  cols.splice(insert, 0, moved);
+  cols.forEach((c, i) => {
+    c.position = i;
+  });
+  data.columns = cols;
+  render();
+  try {
+    await api(`/columns/${columnId}/move`, { method: 'POST', body: { position: insert } });
+    await load();
+  } catch (e) {
+    await load();
+    toast(errMsg(e), 'error');
+  }
+}
+
 function buildCard(card: CardSummary): HTMLElement {
   const node = el('div', { class: 'card', draggable: 'true', 'data-card': String(card.id) });
   const cardLabels = data!.labels.filter((l) => card.labelIds.includes(l.id));
+
+  // 封面图（有 coverUrl 才显示）
+  if (card.coverUrl) {
+    const cover = el('div', { class: 'card-cover' });
+    const img = el('img', { class: 'card-cover-img', alt: '', loading: 'lazy' });
+    img.src = card.coverUrl;
+    cover.append(img);
+    node.append(cover);
+  }
 
   const top = el('div', { class: 'card-top' });
   top.append(el('span', { class: 'card-no muted', text: card.number }), priorityBadge(card.priority));
 
   const title = el('div', { class: 'card-title', text: card.title });
+
+  // 里程碑 / 版本徽标（有值才显示）
+  const chips = el('div', { class: 'card-chips' });
+  if (card.milestoneName) chips.append(el('span', { class: 'chip chip-milestone', text: '◆ ' + card.milestoneName }));
+  if (card.versionName) chips.append(el('span', { class: 'chip chip-version', text: '🏷 ' + card.versionName }));
 
   const meta = el('div', { class: 'card-meta' });
   const left = el('div', { class: 'card-labels' });
@@ -165,7 +361,8 @@ function buildCard(card: CardSummary): HTMLElement {
   }
   meta.append(left, right);
 
-  node.append(top, title, meta);
+  if (chips.children.length) node.append(top, title, chips, meta);
+  else node.append(top, title, meta);
 
   node.addEventListener('click', (e) => {
     if (justDragged) return;

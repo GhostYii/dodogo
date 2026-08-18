@@ -219,6 +219,40 @@
 .meta-card-progress { display: flex; align-items: center; gap: 10px; }
 .meta-card-progress .progress { max-width: 200px; }
 .meta-card-ops { display: flex; justify-content: flex-end; gap: 6px; }
+.meta-card-clickable { cursor: pointer; }
+.meta-card-clickable:hover { border-color: var(--primary); }
+
+/* ---- 里程碑 / 版本详情弹窗 ---- */
+.meta-detail { display: flex; flex-direction: column; gap: 10px; }
+.meta-detail-head { display: flex; align-items: center; gap: 8px; }
+.meta-detail-color { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
+.meta-detail-desc { margin: 0; white-space: pre-wrap; }
+.meta-detail-dates { margin: 0; font-size: 12px; }
+.meta-detail-progress { display: flex; align-items: center; gap: 10px; }
+.meta-detail-cards-title { margin: 6px 0 4px; }
+.meta-card-list { display: flex; flex-direction: column; gap: 4px; }
+.meta-card-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--surface);
+}
+.meta-card-row:hover { border-color: var(--primary); }
+.meta-card-row-no { font-size: 12px; white-space: nowrap; }
+.meta-card-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta-card-row-col { font-size: 12px; white-space: nowrap; }
+.meta-card-row-done { font-size: 12px; white-space: nowrap; }
+.meta-card-row-done.is-done { color: var(--success); }
+.meta-card-row-due { font-size: 12px; white-space: nowrap; }
+
+/* ---- 设置页：项目图标 ---- */
+.settings-icon-row { display: flex; align-items: center; gap: 14px; }
+.settings-icon-preview { flex-shrink: 0; }
+.settings-icon-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 
 /* ---- 设置页 ---- */
 .settings-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }

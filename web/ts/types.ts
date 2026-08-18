@@ -33,10 +33,13 @@ export interface CardSummary {
   assignee: AssigneeDto | null;
   labelIds: number[];
   milestoneId: number | null;
+  milestoneName: string | null;
   versionId: number | null;
+  versionName: string | null;
   dueDate: string | null;
   checklistDone: number;
   checklistTotal: number;
+  coverUrl: string | null;
   updatedAt: string;
 }
 
@@ -142,6 +145,44 @@ export interface VersionDto {
   percent: number;
 }
 
+/** 里程碑/版本详情页中的关联卡片摘要。 */
+export interface MetaCardDto {
+  id: number;
+  no: number;
+  number: string;
+  title: string;
+  columnName: string;
+  done: boolean;
+  priority: string;
+  dueDate: string | null;
+}
+
+export interface MilestoneDetailDto {
+  id: number;
+  name: string;
+  description: string;
+  startDate: string | null;
+  dueDate: string | null;
+  status: string;
+  color: string;
+  totalCards: number;
+  doneCards: number;
+  percent: number;
+  cards: MetaCardDto[];
+}
+
+export interface VersionDetailDto {
+  id: number;
+  name: string;
+  description: string;
+  releaseDate: string | null;
+  status: string;
+  totalCards: number;
+  doneCards: number;
+  percent: number;
+  cards: MetaCardDto[];
+}
+
 export interface CardDetail {
   id: number;
   no: number;
@@ -177,6 +218,8 @@ export interface ProjectDto {
   name: string;
   description: string;
   iconColor: string;
+  iconPath: string;
+  iconText: string;
   ownerId: number;
   status: string;
   role: string | null;

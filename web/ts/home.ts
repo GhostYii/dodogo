@@ -41,6 +41,9 @@ function openNewProjectModal(): void {
   }
   body.append(formField('图标颜色', colorWrap));
 
+  const iconTextInput = el('input', { class: 'input', type: 'text', placeholder: '留空默认取项目名前两字', maxlength: '2' });
+  body.append(formField('图标文字（1-2 字）', iconTextInput));
+
   const tplSelect = el('select', { class: 'select' });
   const tpls: [string, string][] = [
     ['', '标准（待办 / 已完成）'],
@@ -67,6 +70,7 @@ function openNewProjectModal(): void {
     }
     ok.disabled = true;
     try {
+      const iconText = iconTextInput.value.trim();
       await api('/projects', {
         method: 'POST',
         body: {
@@ -74,6 +78,7 @@ function openNewProjectModal(): void {
           name: n,
           description: descInput.value.trim(),
           icon_color: selected,
+          icon_text: iconText || undefined,
           template: tplSelect.value,
         },
       });

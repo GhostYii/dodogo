@@ -21,7 +21,7 @@ pub fn routes() -> axum::Router<AppState> {
         .route("/", get(list_projects).post(create_project))
         .route("/{key}", get(get_project).patch(update_project))
         .route("/{key}/archive", post(toggle_archive))
-        .route("/{key}/icon", post(upload_icon))
+        .route("/{key}/icon", post(upload_icon).delete(remove_icon))
         .route("/{key}", axum::routing::delete(delete_project))
         .route("/{key}/members", get(list_members).post(add_members))
         .route("/{key}/members/{user_id}", axum::routing::patch(update_member).delete(remove_member))
@@ -178,6 +178,22 @@ async fn upload_icon(
         }
     }
     Err(AppError::Param("缺少文件字段".into()))
+}
+
+/// 移除项目自定义图标，切回「颜色 + 文字」模式。
+async fn remove_icon(
+    State(state): State<AppState>,
+    user: RequireAuth,
+    Path(key): Path<String>,
+) -> AppResult<impl IntoResponse> {
+    let p = load_project(&state, &key, &user.0).await?;
+    permission::require_role(&state.pool, &p, &user.0, permission::ROLE_ADMIN).await?;
+    if !p.icon_path.is_empty() {
+        let abs = state.config.uploads_dir().join(&p.icon_path);
+        let _ = tokio::fs::remove_file(&abs).await;
+    }
+    repos::set_project_icon(&state.pool, p.id, "").await?;
+    Ok(ok_empty())
 }
 
 async fn toggle_archive(
