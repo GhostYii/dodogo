@@ -2134,16 +2134,18 @@
     const projectKey3 = document.body.dataset.projectKey || "";
     const listEl = qs("#members-list");
     if (!listEl) return;
+    let existingIds = /* @__PURE__ */ new Set();
     const load2 = async () => {
       listEl.innerHTML = '<div class="muted loading">\u52A0\u8F7D\u4E2D\u2026</div>';
       try {
         const members2 = await api("/projects/" + projectKey3 + "/members");
+        existingIds = new Set(members2.map((m) => m.userId));
         render2(listEl, members2, load2);
       } catch (e) {
         listEl.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`;
       }
     };
-    qs("#btn-add-member")?.addEventListener("click", () => openAddModal(projectKey3, load2));
+    qs("#btn-add-member")?.addEventListener("click", () => openAddModal(projectKey3, existingIds, load2));
     void load2();
   }
   function render2(listEl, members2, reload) {
@@ -2212,7 +2214,7 @@
     table.append(tbody);
     listEl.append(table);
   }
-  function openAddModal(projectKey3, reload) {
+  function openAddModal(projectKey3, existingIds, reload) {
     const body = el("div", { class: "form-stack" });
     let selectedUserId = null;
     let timer;
@@ -2231,12 +2233,13 @@
         const users = await api(
           "/users/search?q=" + encodeURIComponent(q.trim())
         );
+        const filtered = users.filter((u) => !existingIds.has(u.id));
         dropdown.innerHTML = "";
-        if (!users.length) {
+        if (!filtered.length) {
           dropdown.hidden = true;
           return;
         }
-        for (const u of users) {
+        for (const u of filtered) {
           const item = el("div", { class: "autocomplete-item" });
           item.append(avatar({ id: u.id, avatarPath: u.avatarPath, displayName: u.displayName, username: u.username }, "xs"));
           item.append(el("span", { class: "cell-name", text: u.displayName || u.username }));

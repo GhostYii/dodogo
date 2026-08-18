@@ -1,4 +1,7 @@
 /* css/vars.css */
+[hidden] {
+  display: none !important;
+}
 :root {
   --bg: #F5F7FA;
   --surface: #FFFFFF;
