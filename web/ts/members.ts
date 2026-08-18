@@ -18,17 +18,20 @@ export function initMembers(): void {
   const listEl = qs<HTMLElement>('#members-list');
   if (!listEl) return;
 
+  let existingIds = new Set<number>();
+
   const load = async (): Promise<void> => {
     listEl.innerHTML = '<div class="muted loading">加载中…</div>';
     try {
       const members = await api<MemberDto[]>('/projects/' + projectKey + '/members');
+      existingIds = new Set(members.map((m) => m.userId));
       render(listEl, members, load);
     } catch (e) {
       listEl.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`;
     }
   };
 
-  qs('#btn-add-member')?.addEventListener('click', () => openAddModal(projectKey, load));
+  qs('#btn-add-member')?.addEventListener('click', () => openAddModal(projectKey, existingIds, load));
   void load();
 }
 
@@ -103,7 +106,7 @@ function render(listEl: HTMLElement, members: MemberDto[], reload: () => Promise
   listEl.append(table);
 }
 
-function openAddModal(projectKey: string, reload: () => Promise<void>): void {
+function openAddModal(projectKey: string, existingIds: Set<number>, reload: () => Promise<void>): void {
   const body = el('div', { class: 'form-stack' });
 
   let selectedUserId: number | null = null;
@@ -125,12 +128,13 @@ function openAddModal(projectKey: string, reload: () => Promise<void>): void {
       const users = await api<Array<{ id: number; username: string; displayName: string; avatarPath: string | null; email?: string | null }>>(
         '/users/search?q=' + encodeURIComponent(q.trim()),
       );
+      const filtered = users.filter((u) => !existingIds.has(u.id));
       dropdown.innerHTML = '';
-      if (!users.length) {
+      if (!filtered.length) {
         dropdown.hidden = true;
         return;
       }
-      for (const u of users) {
+      for (const u of filtered) {
         const item = el('div', { class: 'autocomplete-item' });
         item.append(avatar({ id: u.id, avatarPath: u.avatarPath, displayName: u.displayName, username: u.username }, 'xs'));
         item.append(el('span', { class: 'cell-name', text: u.displayName || u.username }));

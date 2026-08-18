@@ -280,6 +280,9 @@ async fn add_members(
     if req.role == permission::ROLE_OWNER {
         return Err(AppError::Business("不能直接指定所有者为他人".into()));
     }
+    if repos::get_member_role(&state.pool, p.id, target.id).await?.is_some() {
+        return Err(AppError::Business("该用户已是项目成员".into()));
+    }
     repos::add_member(&state.pool, p.id, target.id, &req.role).await?;
     Ok(ok_empty())
 }
