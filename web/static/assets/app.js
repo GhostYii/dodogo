@@ -345,278 +345,6 @@
     });
   }
 
-  // ts/topbar.ts
-  function initTopbar() {
-    qs("#theme-toggle")?.addEventListener("click", toggleTheme);
-    void loadVersion();
-    const chip = qs("#user-chip");
-    const menu = qs("#user-menu");
-    if (chip && menu) {
-      chip.addEventListener("click", (e) => {
-        e.stopPropagation();
-        menu.hidden = !menu.hidden;
-      });
-      document.addEventListener("click", () => {
-        menu.hidden = true;
-      });
-      qsa("[data-action]", menu).forEach((btn) => {
-        btn.addEventListener("click", () => {
-          menu.hidden = true;
-          void handleUserAction(btn.dataset.action || "");
-        });
-      });
-    }
-    const gs = qs("#global-search");
-    gs?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        const v = gs.value.trim();
-        if (v) location.href = "/search?q=" + encodeURIComponent(v);
-      }
-    });
-    void refreshUnread();
-    initUnreadSse();
-    initShortcuts();
-  }
-  async function loadVersion() {
-    try {
-      const d = await api("/system/status");
-      const v = qs("#brand-version");
-      if (v && d.version) {
-        v.textContent = "v" + d.version;
-        v.hidden = false;
-      }
-    } catch {
-    }
-  }
-  async function handleUserAction(action) {
-    if (action === "logout") {
-      try {
-        await api("/auth/logout", { method: "POST" });
-      } catch {
-      }
-      location.href = "/login";
-    } else if (action === "profile") {
-      await openProfileModal();
-    }
-  }
-  async function openProfileModal() {
-    let me;
-    try {
-      me = await api("/auth/me");
-    } catch {
-      return;
-    }
-    const body = el("div", { class: "profile-form" });
-    const avatarRow = el("div", { class: "profile-avatar-row" });
-    const avatarBox = el("div", { class: "profile-avatar" });
-    avatarBox.append(avatar(me, "lg"));
-    avatarRow.append(avatarBox);
-    const fileInput = el("input", { type: "file", accept: "image/*", hidden: "true" });
-    const avatarBtn = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "\u66F4\u6362\u5934\u50CF" });
-    avatarBtn.addEventListener("click", () => fileInput.click());
-    fileInput.addEventListener("change", async () => {
-      const f = fileInput.files?.[0];
-      if (!f) return;
-      const fd = new FormData();
-      fd.append("file", f);
-      try {
-        const r = await api("/auth/avatar", { method: "POST", form: fd });
-        me.avatarPath = r.avatarPath;
-        toast("\u5934\u50CF\u5DF2\u66F4\u65B0", "success");
-        avatarBox.innerHTML = "";
-        avatarBox.append(avatar(me, "lg"));
-        const chip = qs("#user-chip");
-        if (chip) {
-          const old = chip.querySelector(".avatar");
-          if (old) old.replaceWith(avatar(me, "sm"));
-        }
-      } catch (e) {
-        toast(errMsg(e), "error");
-      }
-    });
-    avatarRow.append(avatarBtn, fileInput);
-    body.append(avatarRow);
-    const nameInput = el("input", { class: "input", type: "text", maxlength: "60" });
-    nameInput.value = me.displayName || "";
-    body.append(formField("\u6635\u79F0", nameInput));
-    const emailInput = el("input", { class: "input", type: "email" });
-    emailInput.value = me.email || "";
-    body.append(formField("\u90AE\u7BB1", emailInput));
-    body.append(el("div", { class: "section-divider" }));
-    const oldPwd = el("input", { class: "input", type: "password", placeholder: "\u65E7\u5BC6\u7801" });
-    const newPwd = el("input", { class: "input", type: "password", placeholder: "\u65B0\u5BC6\u7801\uFF088-64 \u4F4D\uFF0C\u542B\u5B57\u6BCD\u6570\u5B57\uFF09" });
-    const newPwd2 = el("input", { class: "input", type: "password", placeholder: "\u786E\u8BA4\u65B0\u5BC6\u7801" });
-    body.append(formField("\u65E7\u5BC6\u7801", oldPwd));
-    body.append(formField("\u65B0\u5BC6\u7801", newPwd));
-    body.append(formField("\u786E\u8BA4\u65B0\u5BC6\u7801", newPwd2));
-    addPasswordToggles(body);
-    const foot = el("div", { class: "modal-actions" });
-    const save = el("button", { class: "btn btn-primary", type: "button", text: "\u4FDD\u5B58" });
-    save.addEventListener("click", async () => {
-      save.disabled = true;
-      try {
-        await api("/auth/me", {
-          method: "PATCH",
-          body: { display_name: nameInput.value.trim() || me.username, email: emailInput.value.trim() || null }
-        });
-        const oldP = oldPwd.value;
-        const newP = newPwd.value;
-        if (oldP || newP) {
-          if (newP !== newPwd2.value) {
-            toast("\u4E24\u6B21\u8F93\u5165\u7684\u65B0\u5BC6\u7801\u4E0D\u4E00\u81F4", "error");
-            save.disabled = false;
-            return;
-          }
-          await api("/auth/password", { method: "PUT", body: { old_password: oldP, new_password: newP } });
-        }
-        toast("\u5DF2\u4FDD\u5B58", "success");
-        location.reload();
-      } catch (e) {
-        toast(errMsg(e), "error");
-        save.disabled = false;
-      }
-    });
-    foot.append(save);
-    openModal({ title: "\u4E2A\u4EBA\u8BBE\u7F6E", body, footer: foot, width: "480px" });
-  }
-  async function refreshUnread() {
-    try {
-      const d = await api("/notifications/unread-count");
-      const badge = qs("#unread-badge");
-      if (!badge) return;
-      const n = d.count || 0;
-      badge.hidden = n === 0;
-      badge.textContent = n > 99 ? "99+" : String(n);
-    } catch {
-    }
-  }
-  function initUnreadSse() {
-    const es = new EventSource("/api/stream");
-    es.addEventListener("notification.new", (ev) => {
-      void refreshUnread();
-      try {
-        const d = JSON.parse(ev.data);
-        window.dispatchEvent(new CustomEvent("dodogo:notify", { detail: d }));
-      } catch {
-      }
-    });
-    es.onerror = () => {
-    };
-    setInterval(() => void refreshUnread(), 12e4);
-  }
-  function showHelp() {
-    const rows = [
-      ["/", "\u805A\u7126\u5168\u5C40\u641C\u7D22"],
-      ["Esc", "\u5173\u95ED\u5F39\u7A97 / \u83DC\u5355"],
-      ["Shift + ?", "\u663E\u793A\u672C\u5E2E\u52A9"],
-      ["Ctrl + Enter", "\u8BC4\u8BBA\u6846\u4E2D\u63D0\u4EA4\u8BC4\u8BBA"]
-    ];
-    const body = el("div", { class: "help-list" });
-    for (const [k, d] of rows) {
-      const row = el("div", { class: "help-row" });
-      row.append(el("code", { class: "kbd", text: k }), el("span", { text: d }));
-      body.append(row);
-    }
-    openModal({ title: "\u952E\u76D8\u5FEB\u6377\u952E", body });
-  }
-  function initShortcuts() {
-    document.addEventListener("keydown", (e) => {
-      if (isTyping(e.target)) return;
-      if (e.key === "/") {
-        e.preventDefault();
-        const s = qs("#global-search");
-        if (s) {
-          s.focus();
-          s.select();
-        }
-      } else if (e.key === "?" && e.shiftKey) {
-        e.preventDefault();
-        showHelp();
-      }
-    });
-  }
-
-  // ts/auth.ts
-  function initAuth() {
-    const form = qs("#auth-form");
-    const page = document.body.dataset.page;
-    if (!form || page !== "login" && page !== "register" && page !== "setup") return;
-    addPasswordToggles(form);
-    const errorEl = qs("#auth-error");
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      if (errorEl) errorEl.hidden = true;
-      const fd = new FormData(form);
-      const username = String(fd.get("username") || "").trim();
-      const email = String(fd.get("email") || "").trim();
-      const displayName = String(fd.get("displayName") || "").trim();
-      const password = String(fd.get("password") || "");
-      const confirm = String(fd.get("confirm") || "");
-      const submitBtn = form.querySelector("button[type=submit]");
-      const label = submitBtn?.textContent || "\u63D0\u4EA4";
-      if (page !== "login") {
-        if (password !== confirm) {
-          showError(errorEl, "\u4E24\u6B21\u8F93\u5165\u7684\u5BC6\u7801\u4E0D\u4E00\u81F4");
-          return;
-        }
-        if (password.length < 8 || password.length > 64) {
-          showError(errorEl, "\u5BC6\u7801\u957F\u5EA6\u9700\u4E3A 8-64 \u5B57\u7B26");
-          return;
-        }
-        if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
-          showError(errorEl, "\u5BC6\u7801\u9700\u540C\u65F6\u5305\u542B\u5B57\u6BCD\u4E0E\u6570\u5B57");
-          return;
-        }
-      }
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = "\u8BF7\u7A0D\u5019\u2026";
-      }
-      try {
-        if (page === "login") {
-          await api("/auth/login", {
-            method: "POST",
-            body: {
-              identity: String(fd.get("identity") || "").trim(),
-              password,
-              remember: fd.get("remember") === "on"
-            }
-          });
-          location.href = "/";
-        } else {
-          await api("/auth/register", {
-            method: "POST",
-            body: {
-              username,
-              email: email || void 0,
-              display_name: displayName || void 0,
-              password
-            }
-          });
-          await api("/auth/login", { method: "POST", body: { identity: username, password, remember: true } });
-          toast("\u8D26\u53F7\u521B\u5EFA\u6210\u529F", "success");
-          setTimeout(() => {
-            location.href = "/";
-          }, 350);
-        }
-      } catch (err) {
-        showError(errorEl, errMsg(err));
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = label;
-        }
-      }
-    });
-  }
-  function showError(errorEl, msg) {
-    if (errorEl) {
-      errorEl.textContent = msg;
-      errorEl.hidden = false;
-    } else {
-      toast(msg, "error");
-    }
-  }
-
   // ts/markdown.ts
   async function mdToHtml(text) {
     try {
@@ -23852,6 +23580,364 @@ img.ProseMirror-separator {
     return el("span", { class: `prio prio-${p} prio-${size}`, text: priorityText(p) });
   }
 
+  // ts/topbar.ts
+  function initTopbar() {
+    qs("#theme-toggle")?.addEventListener("click", toggleTheme);
+    void loadVersion();
+    const chip = qs("#user-chip");
+    const menu = qs("#user-menu");
+    if (chip && menu) {
+      chip.addEventListener("click", (e) => {
+        e.stopPropagation();
+        menu.hidden = !menu.hidden;
+      });
+      document.addEventListener("click", () => {
+        menu.hidden = true;
+      });
+      qsa("[data-action]", menu).forEach((btn) => {
+        btn.addEventListener("click", () => {
+          menu.hidden = true;
+          void handleUserAction(btn.dataset.action || "");
+        });
+      });
+    }
+    const gs = qs("#global-search");
+    gs?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const v = gs.value.trim();
+        if (v) location.href = "/search?q=" + encodeURIComponent(v);
+      }
+    });
+    void refreshUnread();
+    initUnreadSse();
+    initShortcuts();
+    initNotifPopup();
+  }
+  async function loadVersion() {
+    try {
+      const d = await api("/system/status");
+      const v = qs("#brand-version");
+      if (v && d.version) {
+        v.textContent = "v" + d.version;
+        v.hidden = false;
+      }
+    } catch {
+    }
+  }
+  async function handleUserAction(action) {
+    if (action === "logout") {
+      try {
+        await api("/auth/logout", { method: "POST" });
+      } catch {
+      }
+      location.href = "/login";
+    } else if (action === "profile") {
+      await openProfileModal();
+    }
+  }
+  async function openProfileModal() {
+    let me;
+    try {
+      me = await api("/auth/me");
+    } catch {
+      return;
+    }
+    const body = el("div", { class: "profile-form" });
+    const avatarRow = el("div", { class: "profile-avatar-row" });
+    const avatarBox = el("div", { class: "profile-avatar" });
+    avatarBox.append(avatar(me, "lg"));
+    avatarRow.append(avatarBox);
+    const fileInput = el("input", { type: "file", accept: "image/*", hidden: "true" });
+    const avatarBtn = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "\u66F4\u6362\u5934\u50CF" });
+    avatarBtn.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", async () => {
+      const f = fileInput.files?.[0];
+      if (!f) return;
+      const fd = new FormData();
+      fd.append("file", f);
+      try {
+        const r = await api("/auth/avatar", { method: "POST", form: fd });
+        me.avatarPath = r.avatarPath;
+        toast("\u5934\u50CF\u5DF2\u66F4\u65B0", "success");
+        avatarBox.innerHTML = "";
+        avatarBox.append(avatar(me, "lg"));
+        const chip = qs("#user-chip");
+        if (chip) {
+          const old = chip.querySelector(".avatar");
+          if (old) old.replaceWith(avatar(me, "sm"));
+        }
+      } catch (e) {
+        toast(errMsg(e), "error");
+      }
+    });
+    avatarRow.append(avatarBtn, fileInput);
+    body.append(avatarRow);
+    const nameInput = el("input", { class: "input", type: "text", maxlength: "60" });
+    nameInput.value = me.displayName || "";
+    body.append(formField("\u6635\u79F0", nameInput));
+    const emailInput = el("input", { class: "input", type: "email" });
+    emailInput.value = me.email || "";
+    body.append(formField("\u90AE\u7BB1", emailInput));
+    body.append(el("div", { class: "section-divider" }));
+    const oldPwd = el("input", { class: "input", type: "password", placeholder: "\u65E7\u5BC6\u7801" });
+    const newPwd = el("input", { class: "input", type: "password", placeholder: "\u65B0\u5BC6\u7801\uFF088-64 \u4F4D\uFF0C\u542B\u5B57\u6BCD\u6570\u5B57\uFF09" });
+    const newPwd2 = el("input", { class: "input", type: "password", placeholder: "\u786E\u8BA4\u65B0\u5BC6\u7801" });
+    body.append(formField("\u65E7\u5BC6\u7801", oldPwd));
+    body.append(formField("\u65B0\u5BC6\u7801", newPwd));
+    body.append(formField("\u786E\u8BA4\u65B0\u5BC6\u7801", newPwd2));
+    addPasswordToggles(body);
+    const foot = el("div", { class: "modal-actions" });
+    const save = el("button", { class: "btn btn-primary", type: "button", text: "\u4FDD\u5B58" });
+    save.addEventListener("click", async () => {
+      save.disabled = true;
+      try {
+        await api("/auth/me", {
+          method: "PATCH",
+          body: { display_name: nameInput.value.trim() || me.username, email: emailInput.value.trim() || null }
+        });
+        const oldP = oldPwd.value;
+        const newP = newPwd.value;
+        if (oldP || newP) {
+          if (newP !== newPwd2.value) {
+            toast("\u4E24\u6B21\u8F93\u5165\u7684\u65B0\u5BC6\u7801\u4E0D\u4E00\u81F4", "error");
+            save.disabled = false;
+            return;
+          }
+          await api("/auth/password", { method: "PUT", body: { old_password: oldP, new_password: newP } });
+        }
+        toast("\u5DF2\u4FDD\u5B58", "success");
+        location.reload();
+      } catch (e) {
+        toast(errMsg(e), "error");
+        save.disabled = false;
+      }
+    });
+    foot.append(save);
+    openModal({ title: "\u4E2A\u4EBA\u8BBE\u7F6E", body, footer: foot, width: "480px" });
+  }
+  async function refreshUnread() {
+    try {
+      const d = await api("/notifications/unread-count");
+      const badge = qs("#unread-badge");
+      if (!badge) return;
+      const n = d.count || 0;
+      badge.hidden = n === 0;
+      badge.textContent = n > 99 ? "99+" : String(n);
+    } catch {
+    }
+  }
+  function initUnreadSse() {
+    const es = new EventSource("/api/stream");
+    es.addEventListener("notification.new", (ev) => {
+      void refreshUnread();
+      try {
+        const d = JSON.parse(ev.data);
+        window.dispatchEvent(new CustomEvent("dodogo:notify", { detail: d }));
+      } catch {
+      }
+    });
+    es.onerror = () => {
+    };
+    setInterval(() => void refreshUnread(), 12e4);
+  }
+  var CARD_LINK_RE = /\/p\/([^/]+)\/card\/(\d+)/;
+  function initNotifPopup() {
+    const bell = qs("#bell-btn");
+    const popup = qs("#notif-popup");
+    const listEl = qs("#notif-popup-list");
+    if (!bell || !popup || !listEl) return;
+    let page = 1;
+    let loading = false;
+    let done = false;
+    function renderItem(n) {
+      const row = el("div", { class: "notif-row" + (n.read ? "" : " unread") });
+      const dot = el("span", { class: "notif-dot" });
+      const main = el("div", { class: "notif-main" });
+      main.append(el("div", { class: "notif-title", text: n.title }));
+      if (n.body) main.append(el("div", { class: "muted notif-body", text: n.body }));
+      main.append(el("div", { class: "muted", text: timeAgo(n.createdAt) }));
+      row.append(dot, main);
+      row.addEventListener("click", async () => {
+        if (!n.read) {
+          try {
+            await api(`/notifications/${n.id}/read`, { method: "POST" });
+            n.read = true;
+            row.classList.remove("unread");
+            void refreshUnread();
+          } catch {
+          }
+        }
+        const m = CARD_LINK_RE.exec(n.link || "");
+        if (m) {
+          popup.hidden = true;
+          void openCardDetail(Number(m[2]));
+        } else if (n.link) {
+          location.href = n.link;
+        }
+      });
+      return row;
+    }
+    async function loadMore() {
+      if (loading || done) return;
+      loading = true;
+      try {
+        const items = await api(`/notifications?page=${page}&page_size=20`);
+        if (items.length < 20) done = true;
+        if (page === 1) listEl.innerHTML = "";
+        if (!items.length && page === 1) listEl.innerHTML = '<div class="empty">\u6682\u65E0\u901A\u77E5</div>';
+        for (const n of items) listEl.append(renderItem(n));
+        page += 1;
+      } catch {
+        if (page === 1) listEl.innerHTML = '<div class="empty">\u52A0\u8F7D\u5931\u8D25</div>';
+      } finally {
+        loading = false;
+      }
+    }
+    bell.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (popup.hidden) {
+        popup.hidden = false;
+        page = 1;
+        done = false;
+        listEl.innerHTML = '<div class="muted loading">\u52A0\u8F7D\u4E2D\u2026</div>';
+        void loadMore();
+      } else {
+        popup.hidden = true;
+      }
+    });
+    document.addEventListener("pointerdown", (e) => {
+      const t = e.target;
+      if (!popup.hidden && !popup.contains(t) && !bell.contains(t)) popup.hidden = true;
+    });
+    listEl.addEventListener("scroll", () => {
+      if (listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - 40) void loadMore();
+    });
+    qs("#notif-popup-read-all")?.addEventListener("click", async () => {
+      try {
+        await api("/notifications/read-all", { method: "POST" });
+        listEl.innerHTML = "";
+        page = 1;
+        done = false;
+        void loadMore();
+        void refreshUnread();
+      } catch (e) {
+        toast(errMsg(e), "error");
+      }
+    });
+  }
+  function showHelp() {
+    const rows = [
+      ["/", "\u805A\u7126\u5168\u5C40\u641C\u7D22"],
+      ["Esc", "\u5173\u95ED\u5F39\u7A97 / \u83DC\u5355"],
+      ["Shift + ?", "\u663E\u793A\u672C\u5E2E\u52A9"],
+      ["Ctrl + Enter", "\u8BC4\u8BBA\u6846\u4E2D\u63D0\u4EA4\u8BC4\u8BBA"]
+    ];
+    const body = el("div", { class: "help-list" });
+    for (const [k, d] of rows) {
+      const row = el("div", { class: "help-row" });
+      row.append(el("code", { class: "kbd", text: k }), el("span", { text: d }));
+      body.append(row);
+    }
+    openModal({ title: "\u952E\u76D8\u5FEB\u6377\u952E", body });
+  }
+  function initShortcuts() {
+    document.addEventListener("keydown", (e) => {
+      if (isTyping(e.target)) return;
+      if (e.key === "/") {
+        e.preventDefault();
+        const s = qs("#global-search");
+        if (s) {
+          s.focus();
+          s.select();
+        }
+      } else if (e.key === "?" && e.shiftKey) {
+        e.preventDefault();
+        showHelp();
+      }
+    });
+  }
+
+  // ts/auth.ts
+  function initAuth() {
+    const form = qs("#auth-form");
+    const page = document.body.dataset.page;
+    if (!form || page !== "login" && page !== "register" && page !== "setup") return;
+    addPasswordToggles(form);
+    const errorEl = qs("#auth-error");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (errorEl) errorEl.hidden = true;
+      const fd = new FormData(form);
+      const username = String(fd.get("username") || "").trim();
+      const email = String(fd.get("email") || "").trim();
+      const displayName = String(fd.get("displayName") || "").trim();
+      const password = String(fd.get("password") || "");
+      const confirm = String(fd.get("confirm") || "");
+      const submitBtn = form.querySelector("button[type=submit]");
+      const label = submitBtn?.textContent || "\u63D0\u4EA4";
+      if (page !== "login") {
+        if (password !== confirm) {
+          showError(errorEl, "\u4E24\u6B21\u8F93\u5165\u7684\u5BC6\u7801\u4E0D\u4E00\u81F4");
+          return;
+        }
+        if (password.length < 8 || password.length > 64) {
+          showError(errorEl, "\u5BC6\u7801\u957F\u5EA6\u9700\u4E3A 8-64 \u5B57\u7B26");
+          return;
+        }
+        if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+          showError(errorEl, "\u5BC6\u7801\u9700\u540C\u65F6\u5305\u542B\u5B57\u6BCD\u4E0E\u6570\u5B57");
+          return;
+        }
+      }
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "\u8BF7\u7A0D\u5019\u2026";
+      }
+      try {
+        if (page === "login") {
+          await api("/auth/login", {
+            method: "POST",
+            body: {
+              identity: String(fd.get("identity") || "").trim(),
+              password,
+              remember: fd.get("remember") === "on"
+            }
+          });
+          location.href = "/";
+        } else {
+          await api("/auth/register", {
+            method: "POST",
+            body: {
+              username,
+              email: email || void 0,
+              display_name: displayName || void 0,
+              password
+            }
+          });
+          await api("/auth/login", { method: "POST", body: { identity: username, password, remember: true } });
+          toast("\u8D26\u53F7\u521B\u5EFA\u6210\u529F", "success");
+          setTimeout(() => {
+            location.href = "/";
+          }, 350);
+        }
+      } catch (err) {
+        showError(errorEl, errMsg(err));
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = label;
+        }
+      }
+    });
+  }
+  function showError(errorEl, msg) {
+    if (errorEl) {
+      errorEl.textContent = msg;
+      errorEl.hidden = false;
+    } else {
+      toast(msg, "error");
+    }
+  }
+
   // ts/home.ts
   var ICON_COLORS = ["#3B82F6", "#EF4444", "#F97316", "#EAB308", "#22C55E", "#06B6D4", "#8B5CF6", "#EC4899"];
   function initHome() {
@@ -25360,7 +25446,7 @@ img.ProseMirror-separator {
   }
 
   // ts/notifications.ts
-  var CARD_LINK_RE = /\/p\/([^/]+)\/card\/(\d+)/;
+  var CARD_LINK_RE2 = /\/p\/([^/]+)\/card\/(\d+)/;
   function initNotifications() {
     const listEl = qs("#notifications-list");
     if (!listEl) return;
@@ -25422,7 +25508,7 @@ img.ProseMirror-separator {
           } catch {
           }
         }
-        const m = CARD_LINK_RE.exec(n.link || "");
+        const m = CARD_LINK_RE2.exec(n.link || "");
         if (m) {
           void openCardDetail(Number(m[2]));
         } else if (n.link) {
