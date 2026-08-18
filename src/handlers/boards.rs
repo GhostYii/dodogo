@@ -87,6 +87,15 @@ async fn get_board(State(state): State<AppState>, user: RequireAuth, Path(id): P
     let labels = repos::list_labels(&state.pool, project.id).await?;
     let members = repos::list_members(&state.pool, project.id).await?;
 
+    // 里程碑/版本名称映射（卡片徽标）
+    let milestones = repos::list_milestones(&state.pool, project.id).await?;
+    let versions = repos::list_versions(&state.pool, project.id).await?;
+    let milestone_name_map: HashMap<i64, String> = milestones.iter().map(|m| (m.id, m.name.clone())).collect();
+    let version_name_map: HashMap<i64, String> = versions.iter().map(|v| (v.id, v.name.clone())).collect();
+
+    // 封面图映射（卡片 → 首个图片附件 ID）
+    let cover_map: HashMap<i64, i64> = repos::card_cover_map(&state.pool, id).await?.into_iter().collect();
+
     // 标签聚合
     let mut card_labels: HashMap<i64, Vec<LabelDto>> = HashMap::new();
     for label in &labels {
@@ -148,10 +157,13 @@ async fn get_board(State(state): State<AppState>, user: RequireAuth, Path(id): P
                 assignee: c.assignee_id.and_then(|aid| member_map.get(&aid).cloned()),
                 label_ids: card_labels.get(&c.id).map(|v| v.iter().map(|l| l.id).collect()).unwrap_or_default(),
                 milestone_id: c.milestone_id,
+                milestone_name: c.milestone_id.and_then(|mid| milestone_name_map.get(&mid).cloned()),
                 version_id: c.version_id,
+                version_name: c.version_id.and_then(|vid| version_name_map.get(&vid).cloned()),
                 due_date: c.due_date,
                 checklist_done: done,
                 checklist_total: total,
+                cover_url: cover_map.get(&c.id).map(|att_id| format!("/api/attachments/{att_id}/download")),
                 updated_at: c.updated_at,
             }
         })

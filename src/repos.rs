@@ -296,17 +296,19 @@ pub async fn create_project(
     name: &str,
     description: &str,
     icon_color: &str,
+    icon_text: &str,
     owner_id: i64,
 ) -> AppResult<i64> {
     let ts = now();
     let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO projects (key, name, description, icon_color, owner_id, next_card_no, status, created_at, updated_at) \
-         VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?) RETURNING id",
+        "INSERT INTO projects (key, name, description, icon_color, icon_path, icon_text, owner_id, next_card_no, status, created_at, updated_at) \
+         VALUES (?, ?, ?, ?, '', ?, ?, 0, ?, ?, ?) RETURNING id",
     )
     .bind(key)
     .bind(name)
     .bind(description)
     .bind(icon_color)
+    .bind(icon_text)
     .bind(owner_id)
     .bind(STATUS_ACTIVE)
     .bind(ts)
@@ -365,11 +367,24 @@ pub async fn update_project(
     name: &str,
     description: &str,
     icon_color: &str,
+    icon_text: &str,
 ) -> AppResult<()> {
-    sqlx::query("UPDATE projects SET name = ?, description = ?, icon_color = ?, updated_at = ? WHERE id = ?")
+    sqlx::query("UPDATE projects SET name = ?, description = ?, icon_color = ?, icon_text = ?, updated_at = ? WHERE id = ?")
         .bind(name)
         .bind(description)
         .bind(icon_color)
+        .bind(icon_text)
+        .bind(now())
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// 更新项目图标（上传图片路径）。
+pub async fn set_project_icon(pool: &SqlitePool, id: i64, icon_path: &str) -> AppResult<()> {
+    sqlx::query("UPDATE projects SET icon_path = ?, updated_at = ? WHERE id = ?")
+        .bind(icon_path)
         .bind(now())
         .bind(id)
         .execute(pool)
@@ -1525,6 +1540,60 @@ pub async fn version_stats(pool: &SqlitePool, version_id: i64) -> AppResult<Mile
     .fetch_one(pool)
     .await?;
     Ok(MilestoneStats { total, done })
+}
+
+/// 里程碑/版本详情页卡片行。
+#[derive(sqlx::FromRow)]
+pub struct MetaCardRow {
+    pub id: i64,
+    pub no: i64,
+    pub title: String,
+    pub column_name: String,
+    pub done: bool,
+    pub priority: String,
+    pub due_date: Option<chrono::NaiveDate>,
+}
+
+pub async fn list_cards_for_milestone(pool: &SqlitePool, milestone_id: i64) -> AppResult<Vec<MetaCardRow>> {
+    let rows = sqlx::query_as::<_, MetaCardRow>(
+        "SELECT c.id, c.no, c.title, col.name AS column_name, col.is_done AS done, c.priority, c.due_date \
+         FROM cards c JOIN board_columns col ON col.id = c.column_id \
+         WHERE c.milestone_id = ? AND c.status = 'active' \
+         ORDER BY c.due_date IS NULL, c.due_date, c.no",
+    )
+    .bind(milestone_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+pub async fn list_cards_for_version(pool: &SqlitePool, version_id: i64) -> AppResult<Vec<MetaCardRow>> {
+    let rows = sqlx::query_as::<_, MetaCardRow>(
+        "SELECT c.id, c.no, c.title, col.name AS column_name, col.is_done AS done, c.priority, c.due_date \
+         FROM cards c JOIN board_columns col ON col.id = c.column_id \
+         WHERE c.version_id = ? AND c.status = 'active' \
+         ORDER BY c.due_date IS NULL, c.due_date, c.no",
+    )
+    .bind(version_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+/// 看板内每张卡片的封面图附件 ID（取首个图片附件）。
+pub async fn card_cover_map(pool: &SqlitePool, board_id: i64) -> AppResult<Vec<(i64, i64)>> {
+    let rows = sqlx::query_as::<_, (i64, i64)>(
+        "SELECT a.card_id, MIN(a.id) AS att_id FROM attachments a \
+         JOIN cards c ON c.id = a.card_id \
+         WHERE c.board_id = ? AND c.status = 'active' AND \
+               (a.mime_type LIKE 'image/%' OR a.file_name LIKE '%.png' OR a.file_name LIKE '%.jpg' \
+                OR a.file_name LIKE '%.jpeg' OR a.file_name LIKE '%.gif' OR a.file_name LIKE '%.webp') \
+         GROUP BY a.card_id",
+    )
+    .bind(board_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
 }
 
 pub async fn checklist_progress(pool: &SqlitePool, card_id: i64) -> AppResult<(i64, i64)> {

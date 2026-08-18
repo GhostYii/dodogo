@@ -22,6 +22,25 @@ pub fn routes() -> axum::Router<AppState> {
         .route("/attachments/{id}", axum::routing::delete(delete_attachment))
         .route("/attachments/{id}/download", get(download_attachment))
         .route("/avatars/{user_id}", get(serve_avatar))
+        .route("/project-icons/{project_id}", get(serve_project_icon))
+}
+
+/// 项目自定义图标（无需登录，随项目列表/工作台展示）。
+async fn serve_project_icon(State(state): State<AppState>, Path(project_id): Path<i64>) -> AppResult<Response> {
+    let p = repos::get_project_by_id(&state.pool, project_id).await?.ok_or(AppError::NotFound)?;
+    if p.icon_path.is_empty() {
+        return Ok(Response::builder().status(404).body(Body::from("no icon")).unwrap());
+    }
+    let abs = state.config.uploads_dir().join(&p.icon_path);
+    match tokio::fs::read(&abs).await {
+        Ok(bytes) => {
+            let mime = mime_guess::from_path(&p.icon_path).first_or_octet_stream().to_string();
+            let mut resp = Response::new(Body::from(bytes));
+            resp.headers_mut().insert(CONTENT_TYPE, HeaderValue::from_str(&mime).unwrap_or_else(|_| HeaderValue::from_static("image/png")));
+            Ok(resp)
+        }
+        Err(_) => Ok(Response::builder().status(404).body(Body::from("no icon")).unwrap()),
+    }
 }
 
 async fn upload_attachment(

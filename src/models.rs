@@ -82,6 +82,8 @@ pub struct Project {
     pub name: String,
     pub description: String,
     pub icon_color: String,
+    pub icon_path: String,
+    pub icon_text: String,
     pub owner_id: i64,
     pub next_card_no: i64,
     pub status: String,
@@ -98,6 +100,8 @@ pub struct ProjectDto {
     pub name: String,
     pub description: String,
     pub icon_color: String,
+    pub icon_path: String,
+    pub icon_text: String,
     pub owner_id: i64,
     pub status: String,
     pub role: Option<String>,
@@ -231,10 +235,13 @@ pub struct CardSummaryDto {
     pub assignee: Option<AssigneeDto>,
     pub label_ids: Vec<i64>,
     pub milestone_id: Option<i64>,
+    pub milestone_name: Option<String>,
     pub version_id: Option<i64>,
+    pub version_name: Option<String>,
     pub due_date: Option<chrono::NaiveDate>,
     pub checklist_done: i64,
     pub checklist_total: i64,
+    pub cover_url: Option<String>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -429,6 +436,52 @@ pub struct VersionDto {
     pub total_cards: i64,
     pub done_cards: i64,
     pub percent: i32,
+}
+
+/// 里程碑/版本详情页中的卡片摘要。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetaCardDto {
+    pub id: i64,
+    pub no: i64,
+    pub number: String,
+    pub title: String,
+    pub column_name: String,
+    pub done: bool,
+    pub priority: String,
+    pub due_date: Option<chrono::NaiveDate>,
+}
+
+/// 里程碑详情（含关联卡片）。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MilestoneDetailDto {
+    pub id: i64,
+    pub name: String,
+    pub description: String,
+    pub start_date: Option<chrono::NaiveDate>,
+    pub due_date: Option<chrono::NaiveDate>,
+    pub status: String,
+    pub color: String,
+    pub total_cards: i64,
+    pub done_cards: i64,
+    pub percent: i32,
+    pub cards: Vec<MetaCardDto>,
+}
+
+/// 版本详情（含关联卡片）。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionDetailDto {
+    pub id: i64,
+    pub name: String,
+    pub description: String,
+    pub release_date: Option<chrono::NaiveDate>,
+    pub status: String,
+    pub total_cards: i64,
+    pub done_cards: i64,
+    pub percent: i32,
+    pub cards: Vec<MetaCardDto>,
 }
 
 // ============ GitLab ============
