@@ -10,11 +10,10 @@ export interface ModalOptions {
   onClose?: () => void;
 }
 
-let activeModal: HTMLElement | null = null;
+let modalStack: HTMLElement[] = [];
 
 export function openModal(opts: ModalOptions): HTMLElement {
-  closeModal(false);
-
+  // 弹窗支持堆叠：不关闭下层弹窗（例如卡片详情之上的新建标签/确认对话框）
   const backdrop = el('div', { class: 'modal-backdrop' });
   const modal = el('div', { class: 'modal' });
   if (opts.width) modal.style.maxWidth = opts.width;
@@ -40,7 +39,7 @@ export function openModal(opts: ModalOptions): HTMLElement {
 
   backdrop.append(modal);
   document.body.append(backdrop);
-  activeModal = modal;
+  modalStack.push(backdrop);
 
   backdrop.addEventListener('mousedown', (e) => {
     if (e.target === backdrop) closeModal();
@@ -59,7 +58,7 @@ export function openModal(opts: ModalOptions): HTMLElement {
 }
 
 export function closeModal(runCallback = true): void {
-  const backdrop = document.querySelector<HTMLElement>('.modal-backdrop');
+  const backdrop = modalStack.pop();
   if (!backdrop) return;
   const modal = backdrop.querySelector<HTMLElement>('.modal');
   if (modal) {
@@ -68,11 +67,10 @@ export function closeModal(runCallback = true): void {
     if (runCallback) m.__onClose?.();
   }
   backdrop.remove();
-  activeModal = null;
 }
 
 export function isModalOpen(): boolean {
-  return !!document.querySelector('.modal-backdrop');
+  return modalStack.length > 0;
 }
 
 export function confirmDialog(message: string, opts: { title?: string; danger?: boolean; okText?: string } = {}): Promise<boolean> {
