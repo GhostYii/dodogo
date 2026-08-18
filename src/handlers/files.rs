@@ -2,7 +2,7 @@
 
 use axum::body::Body;
 use axum::extract::{Multipart, Path, State};
-use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
+use axum::http::header::{CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_TYPE};
 use axum::http::HeaderValue;
 use axum::response::{IntoResponse, Response};
 use serde_json::json;
@@ -37,6 +37,7 @@ async fn serve_project_icon(State(state): State<AppState>, Path(project_id): Pat
             let mime = mime_guess::from_path(&p.icon_path).first_or_octet_stream().to_string();
             let mut resp = Response::new(Body::from(bytes));
             resp.headers_mut().insert(CONTENT_TYPE, HeaderValue::from_str(&mime).unwrap_or_else(|_| HeaderValue::from_static("image/png")));
+            resp.headers_mut().insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
             Ok(resp)
         }
         Err(_) => Ok(Response::builder().status(404).body(Body::from("no icon")).unwrap()),
@@ -127,6 +128,8 @@ async fn serve_avatar(State(state): State<AppState>, Path(user_id): Path<i64>) -
             let mime = mime_guess::from_path(&rel).first_or_octet_stream().to_string();
             let mut resp = Response::new(Body::from(bytes));
             resp.headers_mut().insert(CONTENT_TYPE, HeaderValue::from_str(&mime).unwrap_or_else(|_| HeaderValue::from_static("image/png")));
+            // 头像更新后需立即同步到所有位置，禁止缓存
+            resp.headers_mut().insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
             Ok(resp)
         }
         Err(_) => Ok(Response::builder().status(404).body(Body::from("no avatar")).unwrap()),
