@@ -117,7 +117,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let app_url = format!("http://{HOST}:{port}");
-    let title = format!("[DoDoGo v{}]", env!("CARGO_PKG_VERSION"));
+    let title = format!("DoDoGo v{}", env!("CARGO_PKG_VERSION"));
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_title(title)
