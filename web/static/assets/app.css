@@ -430,6 +430,31 @@ textarea.input {
   font-size: 18px;
   border-radius: 10px;
 }
+.icon-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.icon-preview {
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: box-shadow 0.12s;
+}
+.icon-preview:hover {
+  box-shadow: 0 0 0 3px var(--primary);
+}
+.icon-controls {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.icon-controls .field {
+  margin-bottom: 10px;
+}
+.icon-controls .field:last-of-type {
+  margin-bottom: 8px;
+}
 .progress {
   flex: 1;
   height: 6px;
@@ -1362,6 +1387,10 @@ textarea.input {
   font-size: 12px;
   color: var(--text-2);
   white-space: nowrap;
+}
+.col-count-over {
+  color: var(--danger);
+  font-weight: 600;
 }
 .col-actions {
   display: flex;

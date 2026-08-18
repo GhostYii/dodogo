@@ -570,213 +570,6 @@
     }
   }
 
-  // ts/html2md.ts
-  var BLOCK_TAGS = /* @__PURE__ */ new Set([
-    "P",
-    "DIV",
-    "H1",
-    "H2",
-    "H3",
-    "H4",
-    "H5",
-    "H6",
-    "UL",
-    "OL",
-    "BLOCKQUOTE",
-    "PRE",
-    "TABLE",
-    "HR",
-    "LI"
-  ]);
-  function isBlock(node) {
-    return node.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has(node.tagName);
-  }
-  function inline(node) {
-    if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
-    if (node.nodeType !== Node.ELEMENT_NODE) return "";
-    const el2 = node;
-    const inner = () => Array.from(el2.childNodes).map(inline).join("");
-    switch (el2.tagName) {
-      case "STRONG":
-      case "B":
-        return `**${inner()}**`;
-      case "EM":
-      case "I":
-        return `*${inner()}*`;
-      case "DEL":
-      case "S":
-      case "STRIKE":
-        return `~~${inner()}~~`;
-      case "CODE":
-        return `\`${inner()}\``;
-      case "A": {
-        const href = el2.getAttribute("href") || "";
-        const text = inner();
-        if (!href) return text;
-        if (href.startsWith("/search?q=")) {
-          const q = decodeURIComponent(href.slice("/search?q=".length));
-          return `[[${q}]]`;
-        }
-        if (text === href) return `<${href}>`;
-        return `[${text}](${href})`;
-      }
-      case "IMG": {
-        const src = el2.getAttribute("src") || "";
-        const alt = el2.getAttribute("alt") || "";
-        return `![${alt}](${src})`;
-      }
-      case "BR":
-        return "  \n";
-      case "INPUT": {
-        return el2.hasAttribute("checked") ? "[x] " : "[ ] ";
-      }
-      default:
-        return inner();
-    }
-  }
-  function blocks(container2) {
-    let out = "";
-    let buf = "";
-    const flush = () => {
-      const t = buf.trim();
-      if (t) out += t + "\n\n";
-      buf = "";
-    };
-    for (const child of Array.from(container2.childNodes)) {
-      if (child.nodeType === Node.TEXT_NODE) {
-        buf += child.textContent ?? "";
-        continue;
-      }
-      if (child.nodeType !== Node.ELEMENT_NODE) continue;
-      if (isBlock(child)) {
-        flush();
-        out += blockNode(child);
-      } else {
-        buf += inline(child);
-      }
-    }
-    flush();
-    return out;
-  }
-  function blockNode(el2) {
-    switch (el2.tagName) {
-      case "P": {
-        const t = inline(el2).trim();
-        return t ? t + "\n\n" : "\n";
-      }
-      case "DIV":
-        return blocks(el2);
-      case "H1":
-        return `# ${inline(el2)}
-
-`;
-      case "H2":
-        return `## ${inline(el2)}
-
-`;
-      case "H3":
-        return `### ${inline(el2)}
-
-`;
-      case "H4":
-        return `#### ${inline(el2)}
-
-`;
-      case "H5":
-        return `##### ${inline(el2)}
-
-`;
-      case "H6":
-        return `###### ${inline(el2)}
-
-`;
-      case "HR":
-        return "---\n\n";
-      case "BLOCKQUOTE": {
-        const inner = blocks(el2).trim().replace(/\n/g, "\n> ");
-        return `> ${inner}
-
-`;
-      }
-      case "UL":
-        return list(el2, false) + "\n";
-      case "OL":
-        return list(el2, true) + "\n";
-      case "PRE": {
-        const txt = el2.textContent ?? "";
-        return "```\n" + txt.replace(/\n+$/, "") + "\n```\n\n";
-      }
-      case "TABLE":
-        return table(el2) + "\n\n";
-      case "LI":
-        return inline(el2);
-      default:
-        return blocks(el2);
-    }
-  }
-  function list(el2, ordered) {
-    let out = "";
-    let n = 0;
-    for (const child of Array.from(el2.children)) {
-      if (child.tagName !== "LI") continue;
-      n++;
-      const li = child;
-      const marker = ordered ? `${n}. ` : "- ";
-      const lines = [];
-      let buf = "";
-      const flush = () => {
-        const t = buf.trim();
-        if (t) lines.push(t);
-        buf = "";
-      };
-      for (const node of Array.from(li.childNodes)) {
-        if (node.nodeType === Node.TEXT_NODE) {
-          buf += node.textContent ?? "";
-          continue;
-        }
-        if (node.nodeType !== Node.ELEMENT_NODE) continue;
-        const tag = node.tagName;
-        if (tag === "UL" || tag === "OL") {
-          flush();
-          lines.push(list(node, tag === "OL").replace(/\n+$/, ""));
-        } else if (tag === "P" || tag === "DIV") {
-          flush();
-          const t = inline(node).trim();
-          if (t) lines.push(t);
-        } else {
-          buf += inline(node);
-        }
-      }
-      flush();
-      if (!lines.length) lines.push("");
-      out += marker + lines[0] + "\n";
-      for (let i = 1; i < lines.length; i++) out += indent(lines[i], 2) + "\n";
-    }
-    return out;
-  }
-  function indent(text, spaces) {
-    const pad = " ".repeat(spaces);
-    return text.split("\n").map((l) => pad + l).join("\n");
-  }
-  function table(el2) {
-    const rows = Array.from(el2.querySelectorAll("tr"));
-    if (!rows.length) return "";
-    const lines = [];
-    rows.forEach((row, ri) => {
-      const cells = Array.from(row.children).filter((c) => c.tagName === "TH" || c.tagName === "TD");
-      const texts = cells.map((c) => (c.textContent ?? "").trim().replace(/\|/g, "\\|"));
-      lines.push("| " + texts.join(" | ") + " |");
-      if (ri === 0) lines.push("| " + texts.map(() => "---").join(" | ") + " |");
-    });
-    return lines.join("\n");
-  }
-  function htmlToMarkdown(html) {
-    const doc = new DOMParser().parseFromString(html || "", "text/html");
-    const body = doc.body;
-    const out = blocks(body).trim().replace(/\n{3,}/g, "\n\n");
-    return out ? out + "\n" : "";
-  }
-
   // ts/card-modal.ts
   var currentCardId = null;
   var detail = null;
@@ -897,68 +690,32 @@
     view.innerHTML = d.descriptionHtml || '<p class="muted">\u6682\u65E0\u63CF\u8FF0\uFF0C\u70B9\u51FB\u7F16\u8F91\u6DFB\u52A0\u3002</p>';
     view.addEventListener("click", () => showEditor());
     const editor = el("div", { class: "cd-desc-editor", hidden: "true" });
-    const ta = el("textarea", { class: "input", rows: "6", placeholder: "\u652F\u6301 Markdown\u2026" });
+    const ta = el("textarea", { class: "input", rows: "8", placeholder: "\u652F\u6301 Markdown\u2026" });
     ta.value = d.description || "";
-    const toolbar = el("div", { class: "wys-toolbar" });
-    const wys = el("div", { class: "wys-editor markdown-body", contenteditable: "true" });
-    buildWysToolbar(toolbar, wys);
-    const tabs = el("div", { class: "editor-tabs" });
-    const editTab = el("button", { class: "tab-btn active", type: "button", text: "\u7F16\u8F91" });
-    const wysTab = el("button", { class: "tab-btn", type: "button", text: "\u6240\u89C1\u5373\u6240\u5F97" });
-    const prevTab = el("button", { class: "tab-btn", type: "button", text: "\u9884\u89C8" });
-    const preview = el("div", { class: "markdown-body cd-desc-preview", hidden: "true" });
+    const preview = el("div", { class: "markdown-body cd-desc-preview" });
+    preview.innerHTML = d.descriptionHtml || '<p class="muted">\uFF08\u7A7A\uFF09</p>';
+    const renderPreview = debounce(async (md) => {
+      preview.innerHTML = md.trim() ? await mdToHtml(md) : '<p class="muted">\uFF08\u7A7A\uFF09</p>';
+    }, 250);
+    ta.addEventListener("input", () => void renderPreview(ta.value));
     const actions = el("div", { class: "modal-actions" });
     const save = el("button", { class: "btn btn-primary btn-sm", type: "button", text: "\u4FDD\u5B58" });
     const cancel = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "\u53D6\u6D88" });
-    let mode = "edit";
-    function setMode(m) {
-      mode = m;
-      editTab.classList.toggle("active", m === "edit");
-      wysTab.classList.toggle("active", m === "wysiwyg");
-      prevTab.classList.toggle("active", m === "preview");
-      ta.hidden = m !== "edit";
-      toolbar.hidden = m !== "wysiwyg";
-      wys.hidden = m !== "wysiwyg";
-      preview.hidden = m !== "preview";
-    }
-    function currentMarkdown() {
-      return mode === "wysiwyg" ? htmlToMarkdown(wys.innerHTML) : ta.value;
-    }
     function showEditor() {
       view.hidden = true;
       editor.hidden = false;
-      setMode("edit");
       ta.focus();
     }
     function hideEditor() {
       view.hidden = false;
       editor.hidden = true;
     }
-    editTab.addEventListener("click", () => {
-      if (mode === "wysiwyg") ta.value = htmlToMarkdown(wys.innerHTML);
-      setMode("edit");
-    });
-    wysTab.addEventListener("click", async () => {
-      if (mode !== "wysiwyg") {
-        const md = ta.value.trim();
-        wys.innerHTML = md ? await mdToHtml(md) : "<p><br></p>";
-      }
-      setMode("wysiwyg");
-      wys.focus();
-    });
-    prevTab.addEventListener("click", async () => {
-      if (mode === "wysiwyg") ta.value = htmlToMarkdown(wys.innerHTML);
-      preview.innerHTML = '<div class="loading">\u9884\u89C8\u4E2D\u2026</div>';
-      preview.innerHTML = await mdToHtml(ta.value);
-      setMode("preview");
-    });
     save.addEventListener("click", async () => {
       save.disabled = true;
       try {
-        const v = currentMarkdown();
+        const v = ta.value;
         await patchCard({ description: v });
         d.description = v;
-        ta.value = v;
         view.innerHTML = await mdToHtml(v);
         hideEditor();
         toast("\u63CF\u8FF0\u5DF2\u4FDD\u5B58", "success");
@@ -969,57 +726,9 @@
     });
     cancel.addEventListener("click", hideEditor);
     actions.append(save, cancel);
-    tabs.append(editTab, wysTab, prevTab);
-    editor.append(tabs, ta, toolbar, wys, preview, actions);
+    editor.append(ta, preview, actions);
     sec.append(view, editor);
     return sec;
-  }
-  function buildWysToolbar(toolbar, wys) {
-    function btn(title, text, onClick) {
-      const b = el("button", { class: "wys-btn", type: "button", title, text });
-      b.addEventListener("mousedown", (e) => e.preventDefault());
-      b.addEventListener("click", onClick);
-      return b;
-    }
-    function exec(cmd, value) {
-      wys.focus();
-      document.execCommand(cmd, false, value);
-    }
-    toolbar.append(
-      btn("\u52A0\u7C97", "B", () => exec("bold")),
-      btn("\u659C\u4F53", "I", () => exec("italic")),
-      btn("\u6807\u9898 1", "H1", () => exec("formatBlock", "h1")),
-      btn("\u6807\u9898 2", "H2", () => exec("formatBlock", "h2")),
-      btn("\u6807\u9898 3", "H3", () => exec("formatBlock", "h3")),
-      btn("\u65E0\u5E8F\u5217\u8868", "\u2022\u2261", () => exec("insertUnorderedList")),
-      btn("\u6709\u5E8F\u5217\u8868", "1\u2261", () => exec("insertOrderedList")),
-      btn("\u5F15\u7528", "\u275D", () => exec("formatBlock", "blockquote")),
-      btn("\u884C\u5185\u4EE3\u7801", "<>", () => {
-        wys.focus();
-        const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-        const range = sel.getRangeAt(0);
-        try {
-          const code = document.createElement("code");
-          code.appendChild(range.extractContents());
-          range.insertNode(code);
-        } catch {
-        }
-      }),
-      btn("\u94FE\u63A5", "\u{1F517}", () => {
-        wys.focus();
-        const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0) return;
-        const range = sel.getRangeAt(0).cloneRange();
-        const url = window.prompt("\u94FE\u63A5\u5730\u5740", "https://");
-        if (!url) return;
-        wys.focus();
-        const sel2 = window.getSelection();
-        sel2?.removeAllRanges();
-        sel2?.addRange(range);
-        document.execCommand("createLink", false, url);
-      })
-    );
   }
   function buildSidebar(d) {
     const aside = el("aside", { class: "cd-sidebar" });
@@ -1240,9 +949,9 @@
   function buildComments(d) {
     const sec = el("section", { class: "cd-section" });
     sec.append(el("h4", { class: "cd-section-title", text: `\u8BC4\u8BBA\uFF08${d.comments.length}\uFF09` }));
-    const list2 = el("div", { class: "comment-list" });
-    for (const c of d.comments) list2.append(buildCommentRow(c));
-    sec.append(list2);
+    const list = el("div", { class: "comment-list" });
+    for (const c of d.comments) list.append(buildCommentRow(c));
+    sec.append(list);
     const editor = el("div", { class: "comment-editor" });
     const ta = el("textarea", { class: "input", rows: "3", placeholder: "\u8F93\u5165\u8BC4\u8BBA\uFF0C\u652F\u6301 Markdown\uFF1B\u53EF\u76F4\u63A5\u7C98\u8D34\u56FE\u7247\u4E0A\u4F20" });
     ta.addEventListener("paste", async (e) => {
@@ -1306,7 +1015,7 @@
   function buildAttachments(d) {
     const sec = el("section", { class: "cd-section" });
     sec.append(el("h4", { class: "cd-section-title", text: `\u9644\u4EF6\uFF08${d.attachments.length}\uFF09` }));
-    const list2 = el("div", { class: "attach-list" });
+    const list = el("div", { class: "attach-list" });
     for (const a of d.attachments) {
       const row = el("div", { class: "attach-row" });
       const link = el("a", { class: "attach-name", href: `/api/attachments/${a.id}/download`, text: a.fileName });
@@ -1322,9 +1031,9 @@
         }
       });
       row.append(link, el("span", { class: "muted", text: fmtSize(a.fileSize) }), el("span", { class: "muted", text: a.uploaderName + " \xB7 " + timeAgo(a.createdAt) }), del);
-      list2.append(row);
+      list.append(row);
     }
-    sec.append(list2);
+    sec.append(list);
     const up = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "+ \u4E0A\u4F20\u9644\u4EF6" });
     const fileInput = el("input", { type: "file", hidden: "true" });
     up.addEventListener("click", () => fileInput.click());
@@ -1349,9 +1058,9 @@
   function buildGit(d) {
     const sec = el("section", { class: "cd-section" });
     sec.append(el("h4", { class: "cd-section-title", text: "Git \u5173\u8054" }));
-    const list2 = el("div", { class: "git-list" });
+    const list = el("div", { class: "git-list" });
     if (!d.gitCommits.length) {
-      list2.append(el("p", { class: "muted", text: "\u6682\u65E0\u5173\u8054\u63D0\u4EA4\uFF08\u53EF\u901A\u8FC7 GitLab \u540C\u6B65\u5173\u8054\uFF09" }));
+      list.append(el("p", { class: "muted", text: "\u6682\u65E0\u5173\u8054\u63D0\u4EA4\uFF08\u53EF\u901A\u8FC7 GitLab \u540C\u6B65\u5173\u8054\uFF09" }));
     }
     for (const g of d.gitCommits) {
       const row = el("div", { class: "git-row" });
@@ -1359,9 +1068,9 @@
       row.append(sha, el("span", { class: "git-msg", text: g.message }));
       row.append(el("span", { class: "muted", text: g.authorName + " \xB7 " + (g.committedAt ? timeAgo(g.committedAt) : "") }));
       if (g.mrUrl) row.append(el("a", { class: "git-mr", href: g.mrUrl, target: "_blank", rel: "noopener", text: "MR" }));
-      list2.append(row);
+      list.append(row);
     }
-    sec.append(list2);
+    sec.append(list);
     return sec;
   }
   var ACTION_LABELS = {
@@ -1375,8 +1084,8 @@
   function buildActivity(d) {
     const sec = el("section", { class: "cd-section" });
     sec.append(el("h4", { class: "cd-section-title", text: "\u6D3B\u52A8" }));
-    const list2 = el("div", { class: "activity-list" });
-    if (!d.activities.length) list2.append(el("p", { class: "muted", text: "\u6682\u65E0\u6D3B\u52A8\u8BB0\u5F55" }));
+    const list = el("div", { class: "activity-list" });
+    if (!d.activities.length) list.append(el("p", { class: "muted", text: "\u6682\u65E0\u6D3B\u52A8\u8BB0\u5F55" }));
     for (const a of d.activities) {
       const row = el("div", { class: "activity-row" });
       row.append(avatar({ id: a.userId ?? void 0, avatarPath: null, displayName: a.displayName, username: a.username }, "xs"));
@@ -1384,9 +1093,9 @@
       const verb = ACTION_LABELS[a.action] || a.action;
       row.append(el("span", { class: "activity-who", text: who }), el("span", { class: "activity-detail", text: `${verb} ${a.detail || ""}`.trim() }));
       row.append(el("span", { class: "muted", text: timeAgo(a.createdAt) }));
-      list2.append(row);
+      list.append(row);
     }
-    sec.append(list2);
+    sec.append(list);
     return sec;
   }
   function priorityBadge(p, size = "sm") {
@@ -1407,20 +1116,81 @@
     body.append(formField("\u9879\u76EE\u540D\u79F0", nameInput));
     const descInput = el("textarea", { class: "input", rows: "3", placeholder: "\u4E00\u53E5\u8BDD\u63CF\u8FF0\u9879\u76EE\uFF08\u53EF\u9009\uFF09" });
     body.append(formField("\u9879\u76EE\u63CF\u8FF0", descInput));
-    const colorWrap = el("div", { class: "color-swatches" });
     let selected = ICON_COLORS[0];
+    let iconMode = "text";
+    let iconFile = null;
+    let previewUrl = "";
+    let iconTextTouched = false;
+    const iconTextInput = el("input", { class: "input", type: "text", placeholder: "\u7559\u7A7A\u9ED8\u8BA4\u53D6\u9879\u76EE\u540D\u524D\u4E24\u5B57", maxlength: "2" });
+    const colorWrap = el("div", { class: "color-swatches" });
     for (const c of ICON_COLORS) {
       const sw = el("button", { class: "swatch" + (c === selected ? " active" : ""), type: "button", style: `background:${c}` });
       sw.addEventListener("click", () => {
         selected = c;
         qsa(".swatch", colorWrap).forEach((s) => s.classList.remove("active"));
         sw.classList.add("active");
+        updatePreview();
       });
       colorWrap.append(sw);
     }
-    body.append(formField("\u56FE\u6807\u989C\u8272", colorWrap));
-    const iconTextInput = el("input", { class: "input", type: "text", placeholder: "\u7559\u7A7A\u9ED8\u8BA4\u53D6\u9879\u76EE\u540D\u524D\u4E24\u5B57", maxlength: "2" });
-    body.append(formField("\u56FE\u6807\u6587\u5B57\uFF081-2 \u5B57\uFF09", iconTextInput));
+    const preview = el("div", { class: "icon-preview project-icon project-icon-lg", role: "button", "aria-label": "\u70B9\u51FB\u4E0A\u4F20\u56FE\u7247", title: "\u70B9\u51FB\u4E0A\u4F20\u56FE\u7247" });
+    const fileInput = el("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", hidden: "true" });
+    const clearImg = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "\u79FB\u9664\u56FE\u7247\uFF0C\u5207\u56DE\u8272\u5757" });
+    clearImg.hidden = true;
+    function currentIconText() {
+      const t = (iconTextInput.value.trim() || initialsOf(nameInput.value)).trim();
+      return Array.from(t).slice(0, 2).join("") || "?";
+    }
+    function updatePreview() {
+      preview.innerHTML = "";
+      preview.style.background = selected;
+      if (iconMode === "image" && previewUrl) {
+        const img = el("img", { class: "project-icon-img", alt: "\u9879\u76EE\u56FE\u6807\u9884\u89C8" });
+        img.src = previewUrl;
+        preview.append(img);
+        preview.title = "\u70B9\u51FB\u66F4\u6362\u56FE\u7247";
+      } else {
+        preview.append(el("span", { text: currentIconText() }));
+        preview.title = "\u70B9\u51FB\u4E0A\u4F20\u56FE\u7247";
+      }
+    }
+    nameInput.addEventListener("input", () => {
+      if (!iconTextTouched) {
+        const nm = nameInput.value.trim();
+        iconTextInput.value = nm ? initialsOf(nm) : "";
+      }
+      updatePreview();
+    });
+    iconTextInput.addEventListener("input", () => {
+      iconTextTouched = true;
+      updatePreview();
+    });
+    preview.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      const f = fileInput.files?.[0];
+      if (!f) return;
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      iconFile = f;
+      iconMode = "image";
+      previewUrl = URL.createObjectURL(f);
+      clearImg.hidden = false;
+      updatePreview();
+      fileInput.value = "";
+    });
+    clearImg.addEventListener("click", () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = "";
+      iconFile = null;
+      iconMode = "text";
+      clearImg.hidden = true;
+      updatePreview();
+    });
+    updatePreview();
+    const iconControls = el("div", { class: "icon-controls" });
+    iconControls.append(formField("\u56FE\u6807\u989C\u8272", colorWrap), formField("\u56FE\u6807\u6587\u5B57\uFF081-2 \u5B57\uFF09", iconTextInput), clearImg);
+    const iconRow = el("div", { class: "icon-row" });
+    iconRow.append(preview, iconControls);
+    body.append(formField("\u56FE\u6807", iconRow, "\u70B9\u51FB\u9884\u89C8\u6846\u4E0A\u4F20\u56FE\u7247\uFF1B\u6587\u5B57\u7559\u7A7A\u9ED8\u8BA4\u53D6\u9879\u76EE\u540D\u524D\u4E24\u5B57"));
     const tplSelect = el("select", { class: "select" });
     const tpls = [
       ["", "\u6807\u51C6\uFF08\u5F85\u529E / \u5DF2\u5B8C\u6210\uFF09"],
@@ -1446,19 +1216,23 @@
       }
       ok.disabled = true;
       try {
-        const iconText = iconTextInput.value.trim();
-        await api("/projects", {
+        const proj = await api("/projects", {
           method: "POST",
           body: {
             key: k,
             name: n,
             description: descInput.value.trim(),
             icon_color: selected,
-            icon_text: iconText || void 0,
+            icon_text: currentIconText(),
             template: tplSelect.value
           }
         });
-        location.href = `/p/${k}`;
+        if (iconMode === "image" && iconFile) {
+          const fd = new FormData();
+          fd.append("file", iconFile);
+          await api(`/projects/${proj.key}/icon`, { method: "POST", form: fd });
+        }
+        location.href = `/p/${proj.key}`;
       } catch (e) {
         toast(errMsg(e), "error");
         ok.disabled = false;
@@ -1576,8 +1350,17 @@
     });
     void load();
     initSse();
-    document.addEventListener("click", () => {
-      qsa(".col-color-pop").forEach((p) => p.hidden = true);
+    document.addEventListener("pointerdown", (e) => {
+      const t = e.target;
+      qsa(".col-color-pop").forEach((p) => {
+        if (p.hidden) return;
+        if (p.contains(t)) return;
+        if (t.closest(".col-color-btn")) return;
+        p.hidden = true;
+      });
+    }, true);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") qsa(".col-color-pop").forEach((p) => p.hidden = true);
     });
     window.addEventListener("dodogo:card-changed", () => {
       if (refreshTimer) clearTimeout(refreshTimer);
@@ -1607,15 +1390,23 @@
   function buildColumn(col) {
     const colEl = el("div", { class: "board-col", "data-col": String(col.id) });
     const cards = data.cards.filter((c) => c.columnId === col.id).sort((a, b) => a.position - b.position);
-    const visible = cards.filter(matchFilters);
     const head = el("div", { class: "col-head" });
     head.draggable = true;
     const nameSpan = el("span", { class: "col-name", text: col.name });
     nameSpan.title = "\u70B9\u51FB\u6539\u540D\uFF0C\u53EF\u62D6\u62FD\u6392\u5E8F";
     head.append(nameSpan);
-    head.append(el("span", { class: "col-count", text: `${visible.length}/${cards.length}${col.wipLimit > 0 ? ` \xB7 WIP ${col.wipLimit}` : ""}` }));
+    const countEl = el("span", { class: "col-count", text: String(cards.length) });
+    if (col.wipLimit > 0) {
+      countEl.textContent = `${cards.length} / ${col.wipLimit}`;
+      countEl.title = `WIP \u4E0A\u9650 ${col.wipLimit}`;
+      if (cards.length > col.wipLimit) {
+        countEl.classList.add("col-count-over");
+        countEl.title = `\u5DF2\u8D85\u8FC7 WIP \u4E0A\u9650 ${col.wipLimit}`;
+      }
+    }
+    head.append(countEl);
     const colActions = el("span", { class: "col-actions" });
-    const colorBtn = el("button", { class: "btn-icon", type: "button", title: "\u5217\u989C\u8272" });
+    const colorBtn = el("button", { class: "btn-icon col-color-btn", type: "button", title: "\u5217\u989C\u8272" });
     colorBtn.textContent = "\u{1F3A8}";
     const colorPop = el("div", { class: "col-color-pop", hidden: "true" });
     for (const c of COLUMN_COLORS) {
@@ -1624,16 +1415,16 @@
         type: "button",
         style: `background:${c}`
       });
-      sw.addEventListener("click", (e) => {
-        e.stopPropagation();
-        void applyColumnColor(col, c, colorPop);
-      });
+      sw.addEventListener("click", () => void applyColumnColor(col, c, colorPop));
       colorPop.append(sw);
     }
     const custom = el("input", { type: "color", title: "\u81EA\u5B9A\u4E49\u989C\u8272" });
     custom.value = /^#[0-9a-fA-F]{6}$/.test(col.color || "") ? col.color : COLUMN_COLORS[0];
-    custom.addEventListener("input", () => void applyColumnColor(col, custom.value, colorPop));
-    custom.addEventListener("click", (e) => e.stopPropagation());
+    custom.addEventListener("input", () => {
+      colEl.style.background = hexToRgba(custom.value, 0.06);
+      head.style.background = hexToRgba(custom.value, 0.16);
+    });
+    custom.addEventListener("change", () => void applyColumnColor(col, custom.value, colorPop));
     colorPop.append(custom);
     colorBtn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -2268,10 +2059,10 @@
     prog.append(bar, el("span", { class: "muted", text: `${d.doneCards}/${d.totalCards} \u5361\u7247 \xB7 ${pct}%` }));
     body.append(prog);
     body.append(el("h4", { class: "meta-detail-cards-title", text: `\u5173\u8054\u5361\u7247\uFF08${d.cards.length}\uFF09` }));
-    const list2 = el("div", { class: "meta-card-list" });
-    if (!d.cards.length) list2.append(el("p", { class: "muted", text: "\u6682\u65E0\u5173\u8054\u5361\u7247" }));
-    for (const c of d.cards) list2.append(buildDetailCardRow(c));
-    body.append(list2);
+    const list = el("div", { class: "meta-card-list" });
+    if (!d.cards.length) list.append(el("p", { class: "muted", text: "\u6682\u65E0\u5173\u8054\u5361\u7247" }));
+    for (const c of d.cards) list.append(buildDetailCardRow(c));
+    body.append(list);
   }
   function buildDetailCardRow(c) {
     const row = el("div", { class: "meta-card-row" });
@@ -2315,12 +2106,12 @@
       return;
     }
     listEl.innerHTML = "";
-    const table2 = el("table", { class: "table" });
+    const table = el("table", { class: "table" });
     const thead = el("thead");
     thead.append(el("tr"));
     const heads = ["\u6210\u5458", "\u89D2\u8272", "\u52A0\u5165\u65F6\u95F4", "\u64CD\u4F5C"];
     for (const h of heads) thead.querySelector("tr").append(el("th", { text: h }));
-    table2.append(thead);
+    table.append(thead);
     const tbody = el("tbody");
     for (const m of members2) {
       const tr = el("tr");
@@ -2372,8 +2163,8 @@
       tr.append(opTd);
       tbody.append(tr);
     }
-    table2.append(tbody);
-    listEl.append(table2);
+    table.append(tbody);
+    listEl.append(table);
   }
   function openAddModal(projectKey3, reload) {
     const body = el("div", { class: "form-stack" });
@@ -2737,7 +2528,7 @@
       return;
     }
     box.innerHTML = "";
-    const list2 = el("div", { class: "search-results-list" });
+    const list = el("div", { class: "search-results-list" });
     for (const it of items) {
       const row = el("div", { class: "search-row" });
       const main = el("div", { class: "search-row-main" });
@@ -2750,9 +2541,9 @@
       row.append(main);
       if (it.updatedAt) row.append(el("span", { class: "muted", text: timeAgo(it.updatedAt) }));
       row.addEventListener("click", () => void openCardDetail(it.id));
-      list2.append(row);
+      list.append(row);
     }
-    box.append(list2);
+    box.append(list);
   }
 
   // ts/notifications.ts
@@ -2799,7 +2590,7 @@
       return;
     }
     box.innerHTML = "";
-    const list2 = el("div", { class: "notif-list-inner" });
+    const list = el("div", { class: "notif-list-inner" });
     for (const n of items) {
       const row = el("div", { class: "notif-row" + (n.read ? "" : " unread") });
       const dot = el("span", { class: "notif-dot" });
@@ -2825,9 +2616,9 @@
           location.href = n.link;
         }
       });
-      list2.append(row);
+      list.append(row);
     }
-    box.append(list2);
+    box.append(list);
   }
 
   // ts/admin.ts
@@ -2868,20 +2659,20 @@
     const backupBox = el("div", { class: "card" });
     const loadBackups = async () => {
       try {
-        const list2 = await api("/admin/backups");
+        const list = await api("/admin/backups");
         backupBox.innerHTML = "";
-        const table2 = el("table", { class: "table" });
+        const table = el("table", { class: "table" });
         const thead = el("thead");
         thead.append(el("tr"));
         for (const h of ["\u6587\u4EF6\u540D", "\u5927\u5C0F", "\u521B\u5EFA\u65F6\u95F4", "\u64CD\u4F5C"]) thead.querySelector("tr").append(el("th", { text: h }));
-        table2.append(thead);
+        table.append(thead);
         const tbody = el("tbody");
-        if (!list2.length) {
+        if (!list.length) {
           const tr = el("tr");
           tr.append(el("td", { colspan: "4", class: "muted", text: "\u6682\u65E0\u5907\u4EFD" }));
           tbody.append(tr);
         }
-        for (const b of list2) {
+        for (const b of list) {
           const tr = el("tr");
           tr.append(el("td", { text: b.name }));
           tr.append(el("td", { class: "muted", text: fmtSize(b.size) }));
@@ -2902,8 +2693,8 @@
           tr.append(op);
           tbody.append(tr);
         }
-        table2.append(tbody);
-        backupBox.append(table2);
+        table.append(tbody);
+        backupBox.append(table);
       } catch (e) {
         backupBox.innerHTML = `<div class="empty">${esc(errMsg(e))}</div>`;
       }
@@ -2944,11 +2735,11 @@
         });
         bar.append(qInput, el("span", { class: "muted", text: `\u5171 ${d.total} \u4E2A\u7528\u6237` }));
         content.append(bar);
-        const table2 = el("table", { class: "table" });
+        const table = el("table", { class: "table" });
         const thead = el("thead");
         thead.append(el("tr"));
         for (const h of ["\u7528\u6237", "\u89D2\u8272", "\u72B6\u6001", "\u6CE8\u518C\u65F6\u95F4", "\u64CD\u4F5C"]) thead.querySelector("tr").append(el("th", { text: h }));
-        table2.append(thead);
+        table.append(thead);
         const tbody = el("tbody");
         for (const u of d.items) {
           const tr = el("tr");
@@ -3025,8 +2816,8 @@
           tr.append(opTd);
           tbody.append(tr);
         }
-        table2.append(tbody);
-        content.append(table2);
+        table.append(tbody);
+        content.append(table);
         const pager = el("div", { class: "pager" });
         const prev = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "\u4E0A\u4E00\u9875" });
         prev.disabled = page <= 1;
@@ -3137,11 +2928,11 @@
       try {
         const items = await api(`/admin/audit-logs?page=${page}&page_size=30`);
         content.innerHTML = "";
-        const table2 = el("table", { class: "table" });
+        const table = el("table", { class: "table" });
         const thead = el("thead");
         thead.append(el("tr"));
         for (const h of ["\u65F6\u95F4", "\u7528\u6237", "\u64CD\u4F5C", "\u5BF9\u8C61", "IP"]) thead.querySelector("tr").append(el("th", { text: h }));
-        table2.append(thead);
+        table.append(thead);
         const tbody = el("tbody");
         if (!items.length) {
           const tr = el("tr");
@@ -3157,8 +2948,8 @@
           tr.append(el("td", { class: "muted", text: it.ip || "-" }));
           tbody.append(tr);
         }
-        table2.append(tbody);
-        content.append(table2);
+        table.append(tbody);
+        content.append(table);
         const pager = el("div", { class: "pager" });
         const prev = el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "\u4E0A\u4E00\u9875" });
         prev.disabled = page <= 1;

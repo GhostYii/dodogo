@@ -1,11 +1,10 @@
 // 卡片详情弹窗：标题/描述/侧栏字段/清单/评论/附件/活动/Git 关联
 
 import { api, errMsg } from './api';
-import { el, qs, qsa, esc, avatar, formField, selectBox, fmtDate, fmtDateTime, timeAgo, fmtSize, priorityText } from './util';
+import { el, qs, qsa, esc, avatar, debounce, formField, selectBox, fmtDate, fmtDateTime, timeAgo, fmtSize, priorityText } from './util';
 import { toast } from './toast';
 import { openModal, closeModal, confirmDialog, promptDialog } from './modal';
 import { mdToHtml } from './markdown';
-import { htmlToMarkdown } from './html2md';
 import type { CardDetail, LabelDto, AssigneeDto, MemberDto, MilestoneDto, VersionDto, CommentDto, AttachmentDto, ActivityDto, GitCommitDto } from './types';
 
 let currentCardId: number | null = null;
@@ -147,46 +146,24 @@ function buildDescription(d: CardDetail): HTMLElement {
   view.addEventListener('click', () => showEditor());
 
   const editor = el('div', { class: 'cd-desc-editor', hidden: 'true' });
-  const ta = el('textarea', { class: 'input', rows: '6', placeholder: '支持 Markdown…' });
+  const ta = el('textarea', { class: 'input', rows: '8', placeholder: '支持 Markdown…' });
   ta.value = d.description || '';
 
-  // 所见即所得编辑区（工具栏 + contenteditable）
-  const toolbar = el('div', { class: 'wys-toolbar' });
-  const wys = el('div', { class: 'wys-editor markdown-body', contenteditable: 'true' });
-  buildWysToolbar(toolbar, wys);
-
-  const tabs = el('div', { class: 'editor-tabs' });
-  const editTab = el('button', { class: 'tab-btn active', type: 'button', text: '编辑' });
-  const wysTab = el('button', { class: 'tab-btn', type: 'button', text: '所见即所得' });
-  const prevTab = el('button', { class: 'tab-btn', type: 'button', text: '预览' });
-  const preview = el('div', { class: 'markdown-body cd-desc-preview', hidden: 'true' });
+  // 实时预览：输入即渲染（防抖调用后端 Markdown 渲染），无需预览按钮
+  const preview = el('div', { class: 'markdown-body cd-desc-preview' });
+  preview.innerHTML = d.descriptionHtml || '<p class="muted">（空）</p>';
+  const renderPreview = debounce(async (md: string) => {
+    preview.innerHTML = md.trim() ? await mdToHtml(md) : '<p class="muted">（空）</p>';
+  }, 250);
+  ta.addEventListener('input', () => void renderPreview(ta.value));
 
   const actions = el('div', { class: 'modal-actions' });
   const save = el('button', { class: 'btn btn-primary btn-sm', type: 'button', text: '保存' });
   const cancel = el('button', { class: 'btn btn-ghost btn-sm', type: 'button', text: '取消' });
 
-  let mode: 'edit' | 'wysiwyg' | 'preview' = 'edit';
-
-  function setMode(m: 'edit' | 'wysiwyg' | 'preview'): void {
-    mode = m;
-    editTab.classList.toggle('active', m === 'edit');
-    wysTab.classList.toggle('active', m === 'wysiwyg');
-    prevTab.classList.toggle('active', m === 'preview');
-    ta.hidden = m !== 'edit';
-    toolbar.hidden = m !== 'wysiwyg';
-    wys.hidden = m !== 'wysiwyg';
-    preview.hidden = m !== 'preview';
-  }
-
-  /** 当前编辑内容（Markdown）：WYSIWYG 模式从 contenteditable 转换，其余取 textarea。 */
-  function currentMarkdown(): string {
-    return mode === 'wysiwyg' ? htmlToMarkdown(wys.innerHTML) : ta.value;
-  }
-
   function showEditor(): void {
     view.hidden = true;
     editor.hidden = false;
-    setMode('edit');
     ta.focus();
   }
   function hideEditor(): void {
@@ -194,31 +171,12 @@ function buildDescription(d: CardDetail): HTMLElement {
     editor.hidden = true;
   }
 
-  editTab.addEventListener('click', () => {
-    if (mode === 'wysiwyg') ta.value = htmlToMarkdown(wys.innerHTML);
-    setMode('edit');
-  });
-  wysTab.addEventListener('click', async () => {
-    if (mode !== 'wysiwyg') {
-      const md = ta.value.trim();
-      wys.innerHTML = md ? await mdToHtml(md) : '<p><br></p>';
-    }
-    setMode('wysiwyg');
-    wys.focus();
-  });
-  prevTab.addEventListener('click', async () => {
-    if (mode === 'wysiwyg') ta.value = htmlToMarkdown(wys.innerHTML);
-    preview.innerHTML = '<div class="loading">预览中…</div>';
-    preview.innerHTML = await mdToHtml(ta.value);
-    setMode('preview');
-  });
   save.addEventListener('click', async () => {
     save.disabled = true;
     try {
-      const v = currentMarkdown();
+      const v = ta.value;
       await patchCard({ description: v });
       d.description = v;
-      ta.value = v;
       view.innerHTML = await mdToHtml(v);
       hideEditor();
       toast('描述已保存', 'success');
@@ -230,61 +188,9 @@ function buildDescription(d: CardDetail): HTMLElement {
   cancel.addEventListener('click', hideEditor);
 
   actions.append(save, cancel);
-  tabs.append(editTab, wysTab, prevTab);
-  editor.append(tabs, ta, toolbar, wys, preview, actions);
+  editor.append(ta, preview, actions);
   sec.append(view, editor);
   return sec;
-}
-
-/** 所见即所得工具栏：加粗/斜体/标题/列表/引用/行内代码/链接。 */
-function buildWysToolbar(toolbar: HTMLElement, wys: HTMLElement): void {
-  function btn(title: string, text: string, onClick: () => void): HTMLElement {
-    const b = el('button', { class: 'wys-btn', type: 'button', title, text });
-    b.addEventListener('mousedown', (e) => e.preventDefault()); // 防止 contenteditable 失焦
-    b.addEventListener('click', onClick);
-    return b;
-  }
-  function exec(cmd: string, value?: string): void {
-    wys.focus();
-    document.execCommand(cmd, false, value);
-  }
-
-  toolbar.append(
-    btn('加粗', 'B', () => exec('bold')),
-    btn('斜体', 'I', () => exec('italic')),
-    btn('标题 1', 'H1', () => exec('formatBlock', 'h1')),
-    btn('标题 2', 'H2', () => exec('formatBlock', 'h2')),
-    btn('标题 3', 'H3', () => exec('formatBlock', 'h3')),
-    btn('无序列表', '•≡', () => exec('insertUnorderedList')),
-    btn('有序列表', '1≡', () => exec('insertOrderedList')),
-    btn('引用', '❝', () => exec('formatBlock', 'blockquote')),
-    btn('行内代码', '<>', () => {
-      wys.focus();
-      const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-      const range = sel.getRangeAt(0);
-      try {
-        const code = document.createElement('code');
-        code.appendChild(range.extractContents());
-        range.insertNode(code);
-      } catch {
-        /* 忽略无法包裹的选区 */
-      }
-    }),
-    btn('链接', '🔗', () => {
-      wys.focus();
-      const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) return;
-      const range = sel.getRangeAt(0).cloneRange();
-      const url = window.prompt('链接地址', 'https://');
-      if (!url) return;
-      wys.focus();
-      const sel2 = window.getSelection();
-      sel2?.removeAllRanges();
-      sel2?.addRange(range);
-      document.execCommand('createLink', false, url);
-    }),
-  );
 }
 
 // ============ 侧栏 ============

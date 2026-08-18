@@ -280,6 +280,14 @@ textarea.input { resize: vertical; }
 .project-icon-sm { width: 28px; height: 28px; font-size: 12px; border-radius: 6px; }
 .project-icon-lg { width: 48px; height: 48px; font-size: 18px; border-radius: 10px; }
 
+/* 新建项目：图标预览与控件 */
+.icon-row { display: flex; align-items: flex-start; gap: 14px; }
+.icon-preview { cursor: pointer; flex-shrink: 0; transition: box-shadow 0.12s; }
+.icon-preview:hover { box-shadow: 0 0 0 3px var(--primary); }
+.icon-controls { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.icon-controls .field { margin-bottom: 10px; }
+.icon-controls .field:last-of-type { margin-bottom: 8px; }
+
 /* 进度条 */
 .progress {
   flex: 1;

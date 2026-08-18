@@ -70,9 +70,19 @@ export function initBoard(): void {
 
   void load();
   initSse();
-  // 点击其它区域时收起列颜色选择面板
-  document.addEventListener('click', () => {
-    qsa<HTMLElement>('.col-color-pop').forEach((p) => (p.hidden = true));
+  // 点击其它区域时收起列颜色选择面板（颜色按钮自身由 click 处理开关）
+  document.addEventListener('pointerdown', (e) => {
+    const t = e.target as HTMLElement;
+    qsa<HTMLElement>('.col-color-pop').forEach((p) => {
+      if (p.hidden) return;
+      if (p.contains(t)) return; // 面板内部交互（含自定义取色 input）不关闭
+      if (t.closest('.col-color-btn')) return;
+      p.hidden = true;
+    });
+  }, true);
+  // Escape 收起列颜色选择面板
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') qsa<HTMLElement>('.col-color-pop').forEach((p) => (p.hidden = true));
   });
   window.addEventListener('dodogo:card-changed', () => {
     if (refreshTimer) clearTimeout(refreshTimer);
@@ -110,7 +120,6 @@ function render(): void {
 function buildColumn(col: ColumnDto): HTMLElement {
   const colEl = el('div', { class: 'board-col', 'data-col': String(col.id) });
   const cards = data!.cards.filter((c) => c.columnId === col.id).sort((a, b) => a.position - b.position);
-  const visible = cards.filter(matchFilters);
 
   const head = el('div', { class: 'col-head' });
   head.draggable = true;
@@ -118,12 +127,23 @@ function buildColumn(col: ColumnDto): HTMLElement {
   const nameSpan = el('span', { class: 'col-name', text: col.name });
   nameSpan.title = '点击改名，可拖拽排序';
   head.append(nameSpan);
-  head.append(el('span', { class: 'col-count', text: `${visible.length}/${cards.length}${col.wipLimit > 0 ? ` · WIP ${col.wipLimit}` : ''}` }));
+
+  // 列头计数：默认只显示卡片总数；有 WIP 上限时显示「总数 / 上限」，超限高亮
+  const countEl = el('span', { class: 'col-count', text: String(cards.length) });
+  if (col.wipLimit > 0) {
+    countEl.textContent = `${cards.length} / ${col.wipLimit}`;
+    countEl.title = `WIP 上限 ${col.wipLimit}`;
+    if (cards.length > col.wipLimit) {
+      countEl.classList.add('col-count-over');
+      countEl.title = `已超过 WIP 上限 ${col.wipLimit}`;
+    }
+  }
+  head.append(countEl);
 
   const colActions = el('span', { class: 'col-actions' });
 
   // 颜色选择（复用 8 色板 + 自定义），选中后作为列头/列区域背景色
-  const colorBtn = el('button', { class: 'btn-icon', type: 'button', title: '列颜色' });
+  const colorBtn = el('button', { class: 'btn-icon col-color-btn', type: 'button', title: '列颜色' });
   colorBtn.textContent = '🎨';
   const colorPop = el('div', { class: 'col-color-pop', hidden: 'true' });
   for (const c of COLUMN_COLORS) {
@@ -132,16 +152,18 @@ function buildColumn(col: ColumnDto): HTMLElement {
       type: 'button',
       style: `background:${c}`,
     });
-    sw.addEventListener('click', (e) => {
-      e.stopPropagation();
-      void applyColumnColor(col, c, colorPop);
-    });
+    sw.addEventListener('click', () => void applyColumnColor(col, c, colorPop));
     colorPop.append(sw);
   }
   const custom = el('input', { type: 'color', title: '自定义颜色' }) as HTMLInputElement;
   custom.value = /^#[0-9a-fA-F]{6}$/.test(col.color || '') ? col.color : COLUMN_COLORS[0];
-  custom.addEventListener('input', () => void applyColumnColor(col, custom.value, colorPop));
-  custom.addEventListener('click', (e) => e.stopPropagation());
+  // 拖动取色：input 事件实时更新列背景预览（不提交、不关闭面板）
+  custom.addEventListener('input', () => {
+    colEl.style.background = hexToRgba(custom.value, 0.06);
+    head.style.background = hexToRgba(custom.value, 0.16);
+  });
+  // 松手 / 确认：change 事件才最终提交并关闭面板
+  custom.addEventListener('change', () => void applyColumnColor(col, custom.value, colorPop));
   colorPop.append(custom);
   colorBtn.addEventListener('click', (e) => {
     e.stopPropagation();

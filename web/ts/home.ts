@@ -28,21 +28,92 @@ function openNewProjectModal(): void {
   const descInput = el('textarea', { class: 'input', rows: '3', placeholder: '一句话描述项目（可选）' });
   body.append(formField('项目描述', descInput));
 
-  const colorWrap = el('div', { class: 'color-swatches' });
+  // —— 图标：默认「背景色 + 文字」模式，实时预览，点击预览框上传图片 ——
   let selected = ICON_COLORS[0];
+  let iconMode: 'text' | 'image' = 'text';
+  let iconFile: File | null = null;
+  let previewUrl = '';
+  let iconTextTouched = false;
+
+  const iconTextInput = el('input', { class: 'input', type: 'text', placeholder: '留空默认取项目名前两字', maxlength: '2' });
+
+  const colorWrap = el('div', { class: 'color-swatches' });
   for (const c of ICON_COLORS) {
     const sw = el('button', { class: 'swatch' + (c === selected ? ' active' : ''), type: 'button', style: `background:${c}` });
     sw.addEventListener('click', () => {
       selected = c;
       qsa('.swatch', colorWrap).forEach((s) => s.classList.remove('active'));
       sw.classList.add('active');
+      updatePreview();
     });
     colorWrap.append(sw);
   }
-  body.append(formField('图标颜色', colorWrap));
 
-  const iconTextInput = el('input', { class: 'input', type: 'text', placeholder: '留空默认取项目名前两字', maxlength: '2' });
-  body.append(formField('图标文字（1-2 字）', iconTextInput));
+  const preview = el('div', { class: 'icon-preview project-icon project-icon-lg', role: 'button', 'aria-label': '点击上传图片', title: '点击上传图片' });
+  const fileInput = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/gif,image/webp', hidden: 'true' });
+  const clearImg = el('button', { class: 'btn btn-ghost btn-sm', type: 'button', text: '移除图片，切回色块' });
+  clearImg.hidden = true;
+
+  function currentIconText(): string {
+    const t = (iconTextInput.value.trim() || initialsOf(nameInput.value)).trim();
+    return Array.from(t).slice(0, 2).join('') || '?';
+  }
+
+  function updatePreview(): void {
+    preview.innerHTML = '';
+    preview.style.background = selected;
+    if (iconMode === 'image' && previewUrl) {
+      const img = el('img', { class: 'project-icon-img', alt: '项目图标预览' });
+      img.src = previewUrl;
+      preview.append(img);
+      preview.title = '点击更换图片';
+    } else {
+      preview.append(el('span', { text: currentIconText() }));
+      preview.title = '点击上传图片';
+    }
+  }
+
+  // 名称变化：图标文字默认跟随前两字（除非用户已手动改过）
+  nameInput.addEventListener('input', () => {
+    if (!iconTextTouched) {
+      const nm = nameInput.value.trim();
+      iconTextInput.value = nm ? initialsOf(nm) : '';
+    }
+    updatePreview();
+  });
+  iconTextInput.addEventListener('input', () => {
+    iconTextTouched = true;
+    updatePreview();
+  });
+
+  preview.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files?.[0];
+    if (!f) return;
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    iconFile = f;
+    iconMode = 'image';
+    previewUrl = URL.createObjectURL(f);
+    clearImg.hidden = false;
+    updatePreview();
+    fileInput.value = '';
+  });
+  clearImg.addEventListener('click', () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = '';
+    iconFile = null;
+    iconMode = 'text';
+    clearImg.hidden = true;
+    updatePreview();
+  });
+
+  updatePreview();
+
+  const iconControls = el('div', { class: 'icon-controls' });
+  iconControls.append(formField('图标颜色', colorWrap), formField('图标文字（1-2 字）', iconTextInput), clearImg);
+  const iconRow = el('div', { class: 'icon-row' });
+  iconRow.append(preview, iconControls);
+  body.append(formField('图标', iconRow, '点击预览框上传图片；文字留空默认取项目名前两字'));
 
   const tplSelect = el('select', { class: 'select' });
   const tpls: [string, string][] = [
@@ -70,19 +141,24 @@ function openNewProjectModal(): void {
     }
     ok.disabled = true;
     try {
-      const iconText = iconTextInput.value.trim();
-      await api('/projects', {
+      const proj = await api<ProjectDto>('/projects', {
         method: 'POST',
         body: {
           key: k,
           name: n,
           description: descInput.value.trim(),
           icon_color: selected,
-          icon_text: iconText || undefined,
+          icon_text: currentIconText(),
           template: tplSelect.value,
         },
       });
-      location.href = `/p/${k}`;
+      // 用户已选图：先创建项目拿到 key，再上传图标
+      if (iconMode === 'image' && iconFile) {
+        const fd = new FormData();
+        fd.append('file', iconFile);
+        await api(`/projects/${proj.key}/icon`, { method: 'POST', form: fd });
+      }
+      location.href = `/p/${proj.key}`;
     } catch (e) {
       toast(errMsg(e), 'error');
       ok.disabled = false;
