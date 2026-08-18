@@ -855,7 +855,7 @@ dependencies = [
 
 [[package]]
 name = "dodogo"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes-gcm",
  "ammonia",
@@ -894,7 +894,7 @@ dependencies = [
 
 [[package]]
 name = "dodogo-desktop"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "tao",
  "ureq",
