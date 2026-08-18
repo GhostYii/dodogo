@@ -27,12 +27,14 @@
 
 ## 3. 项目与成员（`/api/projects`）
 
-- `GET /api/projects` → 项目数组（含 `role`）
-- `POST /api/projects` `{key,name,description?,iconColor?,template?}`（template: ``|`dev`|`todo`）
+- `GET /api/projects` → 项目数组（含 `role`、`iconColor`、`iconPath`、`iconText`）
+- `POST /api/projects` `{key,name,description?,iconColor?,iconText?,template?}`（template: ``|`dev`|`todo`）
 - `GET /api/projects/{key}`
-- `PATCH /api/projects/{key}` `{name,description?,iconColor?}`
+- `PATCH /api/projects/{key}` `{name,description?,iconColor?,iconText?}`
+- `POST /api/projects/{key}/icon`（multipart `file`，上传自定义图标，返回 `{iconPath}`）
+- `GET /api/project-icons/{projectId}`（返回图标图片，无图标 404）
 - `POST /api/projects/{key}/archive`
-- `DELETE /api/projects/{key}?confirmKey=KEY`
+- `DELETE /api/projects/{key}?confirm_key=KEY`
 - `GET /api/projects/{key}/members` → `[{userId,username,displayName,avatarPath,role,joinedAt}]`
 - `POST /api/projects/{key}/members` `{identity,role}`（role: admin|member|viewer）
 - `PATCH /api/projects/{key}/members/{userId}` `{role}`
@@ -44,11 +46,11 @@
 - `POST /api/projects/{key}/boards` `{name,color?}`
 - `GET /api/boards/{id}` → `{board,columns,cards,labels,members}`（看板全量）
   - columns: `[{id,name,position,color,wipLimit,isDone}]`
-  - cards: `[{id,no,number,title,columnId,position,priority,assignee?,labelIds[],milestoneId?,versionId?,dueDate?,checklistDone,checklistTotal,updatedAt}]`
+  - cards: `[{id,no,number,title,columnId,position,priority,assignee?,labelIds[],milestoneId?,milestoneName?,versionId?,versionName?,dueDate?,checklistDone,checklistTotal,coverUrl?,updatedAt}]`
   - labels: `[{id,name,color}]`；members: `[{id,username,displayName,avatarPath}]`
 - `PATCH /api/boards/{id}` `{name,color?}`；`DELETE /api/boards/{id}`
 - `POST /api/boards/{id}/columns` `{name,color?,wipLimit?,isDone?}`
-- `PATCH /api/columns/{id}`（同上）；`DELETE /api/columns/{id}`；`POST /api/columns/{id}/move` `{position}`
+- `PATCH /api/columns/{id}`（同上，含改名/改色）；`DELETE /api/columns/{id}`；`POST /api/columns/{id}/move` `{position}`
 - `POST /api/columns/{id}/cards` `{title,description?,priority?,assigneeId?,dueDate?,milestoneId?,versionId?,templateId?}` → `{id,no,number}`
 - `GET /api/cards/{id}` → 卡片详情（见下）
 - `PATCH /api/cards/{id}` `{title?,description?,assigneeId?,priority?,startDate?,dueDate?,estimateHours?,milestoneId?,versionId?,updatedAt?}`
@@ -80,8 +82,10 @@ gitCommits[{id,shortSha,authorName,message,committedAt,commitUrl,mrUrl}]
 
 - `GET|POST /api/projects/{key}/milestones`（POST `{name,description?,startDate?,dueDate?,status?,color?}`）
   → 列表项 `{id,name,description,startDate,dueDate,status,color,totalCards,doneCards,percent}`
+- `GET /api/milestones/{id}` → 里程碑详情，追加 `cards:[{id,no,number,title,columnName,done,priority,dueDate}]`
 - `PATCH|DELETE /api/milestones/{id}`
 - `GET|POST /api/projects/{key}/releases`（POST `{name,description?,releaseDate?,status?}`）→ 同里程碑结构
+- `GET /api/releases/{id}` → 版本详情，追加 `cards:[...]`
 - `PATCH|DELETE /api/releases/{id}`
 
 ## 7. 通知 / 搜索
