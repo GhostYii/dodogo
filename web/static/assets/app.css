@@ -262,6 +262,36 @@ select.select {
 textarea.input {
   resize: vertical;
 }
+.pwd-wrap {
+  position: relative;
+  display: block;
+}
+.pwd-wrap .input {
+  width: 100%;
+  padding-right: 38px;
+}
+.pwd-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--text-2);
+}
+.pwd-toggle:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
 .check-row {
   display: flex;
   align-items: center;
@@ -701,6 +731,16 @@ textarea.input {
 }
 .brand:hover {
   text-decoration: none;
+}
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.brand-version {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-2);
 }
 .brand-logo {
   width: 28px;
@@ -1411,6 +1451,9 @@ textarea.input {
   border-radius: 8px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
   z-index: 30;
+}
+.col-color-pop[hidden] {
+  display: none;
 }
 .col-color-pop input[type=color] {
   width: 26px;

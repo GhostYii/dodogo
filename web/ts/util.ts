@@ -43,6 +43,25 @@ export function isTyping(target: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
 }
 
+/** 为密码输入框追加「显示/隐藏密码」切换按钮（包装成 .pwd-wrap）。 */
+export function addPasswordToggles(root: ParentNode): void {
+  root.querySelectorAll<HTMLInputElement>('input[type="password"]').forEach((input) => {
+    if (input.closest('.pwd-wrap')) return; // 已处理过
+    const wrap = el('div', { class: 'pwd-wrap' });
+    input.parentNode?.insertBefore(wrap, input);
+    wrap.appendChild(input);
+    const btn = el('button', { class: 'pwd-toggle', type: 'button', title: '显示密码', 'aria-label': '显示密码' });
+    btn.textContent = '👁';
+    btn.addEventListener('click', () => {
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.textContent = show ? '🙈' : '👁';
+      btn.title = show ? '隐藏密码' : '显示密码';
+    });
+    wrap.appendChild(btn);
+  });
+}
+
 export function debounce<A extends unknown[]>(fn: (...args: A) => void, ms: number): (...args: A) => void {
   let t: ReturnType<typeof setTimeout> | undefined;
   return (...args: A) => {

@@ -16,6 +16,8 @@
 
 .brand { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 700; font-size: 15px; }
 .brand:hover { text-decoration: none; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.1; }
+.brand-version { font-size: 10px; font-weight: 500; color: var(--text-2); }
 .brand-logo {
   width: 28px;
   height: 28px;

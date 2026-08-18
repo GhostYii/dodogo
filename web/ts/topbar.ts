@@ -1,13 +1,15 @@
 // 顶栏：主题切换、用户菜单、全局搜索、未读通知（SSE + 轮询）、快捷键
 
 import { api, errMsg } from './api';
-import { el, qs, qsa, avatar, formField, isTyping } from './util';
+import { el, qs, qsa, avatar, formField, isTyping, addPasswordToggles } from './util';
 import { toggleTheme } from './theme';
 import { toast } from './toast';
 import { openModal } from './modal';
 
 export function initTopbar(): void {
   qs('#theme-toggle')?.addEventListener('click', toggleTheme);
+
+  void loadVersion();
 
   const chip = qs('#user-chip');
   const menu = qs<HTMLElement>('#user-menu');
@@ -38,6 +40,21 @@ export function initTopbar(): void {
   void refreshUnread();
   initUnreadSse();
   initShortcuts();
+}
+
+// ============ 版本号 ============
+
+async function loadVersion(): Promise<void> {
+  try {
+    const d = await api<{ version: string }>('/system/status');
+    const v = qs('#brand-version');
+    if (v && d.version) {
+      v.textContent = 'v' + d.version;
+      v.hidden = false;
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 // ============ 用户菜单 ============
@@ -110,6 +127,7 @@ async function openProfileModal(): Promise<void> {
   body.append(formField('旧密码', oldPwd));
   body.append(formField('新密码', newPwd));
   body.append(formField('确认新密码', newPwd2));
+  addPasswordToggles(body);
 
   const foot = el('div', { class: 'modal-actions' });
   const save = el('button', { class: 'btn btn-primary', type: 'button', text: '保存' });

@@ -114,6 +114,23 @@
     const tag = target.tagName;
     return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
   }
+  function addPasswordToggles(root) {
+    root.querySelectorAll('input[type="password"]').forEach((input) => {
+      if (input.closest(".pwd-wrap")) return;
+      const wrap = el("div", { class: "pwd-wrap" });
+      input.parentNode?.insertBefore(wrap, input);
+      wrap.appendChild(input);
+      const btn = el("button", { class: "pwd-toggle", type: "button", title: "\u663E\u793A\u5BC6\u7801", "aria-label": "\u663E\u793A\u5BC6\u7801" });
+      btn.textContent = "\u{1F441}";
+      btn.addEventListener("click", () => {
+        const show = input.type === "password";
+        input.type = show ? "text" : "password";
+        btn.textContent = show ? "\u{1F648}" : "\u{1F441}";
+        btn.title = show ? "\u9690\u85CF\u5BC6\u7801" : "\u663E\u793A\u5BC6\u7801";
+      });
+      wrap.appendChild(btn);
+    });
+  }
   function debounce(fn, ms) {
     let t;
     return (...args) => {
@@ -321,6 +338,7 @@
   // ts/topbar.ts
   function initTopbar() {
     qs("#theme-toggle")?.addEventListener("click", toggleTheme);
+    void loadVersion();
     const chip = qs("#user-chip");
     const menu = qs("#user-menu");
     if (chip && menu) {
@@ -348,6 +366,17 @@
     void refreshUnread();
     initUnreadSse();
     initShortcuts();
+  }
+  async function loadVersion() {
+    try {
+      const d = await api("/system/status");
+      const v = qs("#brand-version");
+      if (v && d.version) {
+        v.textContent = "v" + d.version;
+        v.hidden = false;
+      }
+    } catch {
+    }
   }
   async function handleUserAction(action) {
     if (action === "logout") {
@@ -401,6 +430,7 @@
     body.append(formField("\u65E7\u5BC6\u7801", oldPwd));
     body.append(formField("\u65B0\u5BC6\u7801", newPwd));
     body.append(formField("\u786E\u8BA4\u65B0\u5BC6\u7801", newPwd2));
+    addPasswordToggles(body);
     const foot = el("div", { class: "modal-actions" });
     const save = el("button", { class: "btn btn-primary", type: "button", text: "\u4FDD\u5B58" });
     save.addEventListener("click", async () => {
@@ -485,6 +515,7 @@
     const form = qs("#auth-form");
     const page = document.body.dataset.page;
     if (!form || page !== "login" && page !== "register" && page !== "setup") return;
+    addPasswordToggles(form);
     const errorEl = qs("#auth-error");
     form.addEventListener("submit", async (e) => {
       e.preventDefault();

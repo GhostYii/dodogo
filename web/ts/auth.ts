@@ -1,13 +1,15 @@
 // 登录 / 注册 / 初始化向导
 
 import { api, errMsg } from './api';
-import { qs } from './util';
+import { qs, addPasswordToggles } from './util';
 import { toast } from './toast';
 
 export function initAuth(): void {
   const form = qs<HTMLFormElement>('#auth-form');
   const page = document.body.dataset.page;
   if (!form || (page !== 'login' && page !== 'register' && page !== 'setup')) return;
+
+  addPasswordToggles(form);
 
   const errorEl = qs<HTMLElement>('#auth-error');
 

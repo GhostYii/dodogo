@@ -175,6 +175,29 @@ p { margin: 0 0 8px; }
 select.input, select.select { cursor: pointer; }
 textarea.input { resize: vertical; }
 
+/* 密码显隐切换 */
+.pwd-wrap { position: relative; display: block; }
+.pwd-wrap .input { width: 100%; padding-right: 38px; }
+.pwd-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--text-2);
+}
+.pwd-toggle:hover { color: var(--text); background: var(--surface-2); }
+
 .check-row {
   display: flex;
   align-items: center;

@@ -64,6 +64,8 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
   z-index: 30;
 }
+/* 关键：hidden 属性优先级需高于 display:flex，否则面板常驻显示 */
+.col-color-pop[hidden] { display: none; }
 .col-color-pop input[type="color"] {
   width: 26px;
   height: 26px;
@@ -71,8 +73,7 @@
   border: 1px solid var(--border);
   border-radius: 6px;
   background: none;
-  cursor: pointer;
-}
+  cursor: pointer;}
 
 .col-cards {
   padding: 8px;
