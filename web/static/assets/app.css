@@ -458,6 +458,12 @@ textarea.input {
   height: 56px;
   font-size: 22px;
 }
+.avatar-xl {
+  width: 88px;
+  height: 88px;
+  font-size: 34px;
+  border-radius: 16px;
+}
 .avatar-initial {
   border: 1px solid var(--border);
 }
@@ -1366,6 +1372,47 @@ textarea.input {
   place-items: center;
   padding: 24px;
 }
+.user-profile {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+.user-profile-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.user-profile-name {
+  margin: 8px 0 0;
+  font-size: 22px;
+}
+.user-profile-username {
+  margin: 0;
+  color: var(--text-2);
+}
+.user-profile-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.user-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  text-decoration: none;
+}
+.user-link:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
 @media (max-width: 768px) {
   .brand-name {
     display: none;
@@ -1591,6 +1638,10 @@ textarea.input {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+.card-assignee {
+  display: inline-flex;
+  text-decoration: none;
 }
 .card-labels {
   display: flex;

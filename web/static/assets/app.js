@@ -192,6 +192,18 @@
     }
     return el("span", { class: `avatar avatar-${size} avatar-initial`, text: initialsOf(name) });
   }
+  function userLink(user, size = "sm") {
+    const id = user?.id ?? user?.userId;
+    const display = (user?.displayName || user?.username || "?").trim();
+    const username = (user?.username || "").trim();
+    const a = el("a", { class: "user-link", href: id != null ? `/users/${id}` : "#" });
+    a.append(avatar(user, size));
+    a.append(el("span", { text: display }));
+    if (username && username !== display) {
+      a.append(el("span", { class: "muted", text: "@" + username }));
+    }
+    return a;
+  }
   function priorityText(p) {
     switch (p) {
       case "p0":
@@ -1042,10 +1054,9 @@
   }
   function buildCommentRow(c) {
     const row = el("div", { class: "comment" });
-    row.append(avatar({ id: c.userId, avatarPath: c.avatarPath, displayName: c.displayName, username: c.username }, "sm"));
+    row.append(userLink({ id: c.userId, avatarPath: c.avatarPath, displayName: c.displayName, username: c.username }, "sm"));
     const main = el("div", { class: "comment-main" });
     const head = el("div", { class: "comment-head" });
-    head.append(el("span", { class: "comment-author", text: c.displayName || c.username }));
     head.append(el("span", { class: "muted", text: timeAgo(c.createdAt) }));
     main.append(head);
     const content = el("div", { class: "markdown-body" });
@@ -1133,7 +1144,8 @@
       row.append(avatar({ id: a.userId ?? void 0, avatarPath: null, displayName: a.displayName, username: a.username }, "xs"));
       const who = a.displayName || a.username || "\u7CFB\u7EDF";
       const verb = ACTION_LABELS[a.action] || a.action;
-      row.append(el("span", { class: "activity-who", text: who }), el("span", { class: "activity-detail", text: `${verb} ${a.detail || ""}`.trim() }));
+      const whoEl = a.userId != null ? el("a", { class: "activity-who user-link", href: `/users/${a.userId}`, text: who }) : el("span", { class: "activity-who", text: who });
+      row.append(whoEl, el("span", { class: "activity-detail", text: `${verb} ${a.detail || ""}`.trim() }));
       row.append(el("span", { class: "muted", text: timeAgo(a.createdAt) }));
       list.append(row);
     }
@@ -1666,7 +1678,9 @@
       right.append(el("span", { class: "card-due" + (overdue ? " overdue" : ""), text: fmtDate(card.dueDate) }));
     }
     if (card.assignee) {
-      right.append(avatar(card.assignee, "sm"));
+      const assigneeLink = el("a", { class: "card-assignee", href: `/users/${card.assignee.id}`, title: card.assignee.displayName || card.assignee.username });
+      assigneeLink.append(avatar(card.assignee, "sm"));
+      right.append(assigneeLink);
     }
     meta.append(left, right);
     if (chips.children.length) node.append(top, title, chips, meta);
@@ -2172,9 +2186,7 @@
     for (const m of members2) {
       const tr = el("tr");
       const nameTd = el("td", { class: "cell-user" });
-      nameTd.append(avatar({ id: m.userId, avatarPath: m.avatarPath, displayName: m.displayName, username: m.username }, "sm"));
-      nameTd.append(el("span", { class: "cell-name", text: m.displayName || m.username }));
-      if (m.username && m.displayName !== m.username) nameTd.append(el("span", { class: "muted", text: "@" + m.username }));
+      nameTd.append(userLink({ id: m.userId, avatarPath: m.avatarPath, displayName: m.displayName, username: m.username }, "sm"));
       tr.append(nameTd);
       const roleTd = el("td");
       if (m.role === "owner") {
