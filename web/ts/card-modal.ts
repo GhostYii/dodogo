@@ -57,11 +57,14 @@ export async function refreshOpenCard(): Promise<void> {
   if (currentCardId == null) return;
   const body = qs<HTMLElement>('.card-detail');
   if (!body) return;
+  const scrollEl = qs<HTMLElement>('.modal-body');
+  const scrollTop = scrollEl?.scrollTop ?? 0;
   try {
     const d = await api<CardDetail>('/cards/' + currentCardId);
     detail = d;
     await loadMeta(d);
     renderDetail(body, d);
+    if (scrollEl) scrollEl.scrollTop = scrollTop;
   } catch {
     /* 保留旧内容 */
   }
