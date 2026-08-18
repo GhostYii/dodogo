@@ -2,6 +2,9 @@
 /data
 /release
 node_modules/
+# 文档不纳入 git 管理（source 目录仅保留代码）
+README.md
+/docs/
 *.db
 *.db-wal
 *.db-shm
