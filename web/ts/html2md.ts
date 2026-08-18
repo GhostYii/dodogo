@@ -1,5 +1,5 @@
-// 精简 HTML → Markdown 转换（供所见即所得编辑器保存时使用）
-// 覆盖：加粗/斜体/删除线/标题/列表/引用/代码/链接/段落/换行；图片与表格做基础还原。
+// HTML → Markdown 转换（供 TipTap 所见即所得编辑器保存时使用）
+// 覆盖：加粗/斜体/删除线/标题/有序无序列表/任务列表/引用/行内代码/代码块/链接/图片/分割线/表格/段落/换行。
 
 const BLOCK_TAGS = new Set([
   'P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
@@ -49,6 +49,7 @@ function inline(node: Node): string {
     case 'BR':
       return '  \n';
     case 'INPUT': {
+      if ((el.getAttribute('type') || '').toLowerCase() !== 'checkbox') return '';
       return el.hasAttribute('checked') ? '[x] ' : '[ ] ';
     }
     default:
@@ -103,8 +104,10 @@ function blockNode(el: HTMLElement): string {
     case 'UL': return list(el, false) + '\n';
     case 'OL': return list(el, true) + '\n';
     case 'PRE': {
+      const codeEl = el.querySelector('code');
+      const lang = codeEl ? (codeEl.className.match(/language-([\w+-]+)/) || [])[1] || '' : '';
       const txt = el.textContent ?? '';
-      return '```\n' + txt.replace(/\n+$/, '') + '\n```\n\n';
+      return '```' + lang + '\n' + txt.replace(/\n+$/, '') + '\n```\n\n';
     }
     case 'TABLE': return table(el) + '\n\n';
     case 'LI': return inline(el);
@@ -119,7 +122,10 @@ function list(el: HTMLElement, ordered: boolean): string {
     if (child.tagName !== 'LI') continue;
     n++;
     const li = child as HTMLElement;
+    const isTask = li.getAttribute('data-type') === 'taskItem';
+    const checked = li.getAttribute('data-checked') === 'true';
     const marker = ordered ? `${n}. ` : '- ';
+
     const lines: string[] = [];
     let buf = '';
     const flush = () => {
@@ -141,13 +147,18 @@ function list(el: HTMLElement, ordered: boolean): string {
         flush();
         const t = inline(node as HTMLElement).trim();
         if (t) lines.push(t);
+      } else if (isTask && tag === 'LABEL') {
+        // 任务清单复选框：状态已在首行前缀体现，跳过该元素
+        continue;
       } else {
         buf += inline(node);
       }
     }
     flush();
+
     if (!lines.length) lines.push('');
-    out += marker + lines[0] + '\n';
+    const first = (isTask ? (checked ? '[x] ' : '[ ] ') : '') + lines[0];
+    out += marker + first + '\n';
     for (let i = 1; i < lines.length; i++) out += indent(lines[i], 2) + '\n';
   }
   return out;
@@ -164,7 +175,7 @@ function table(el: HTMLElement): string {
   const lines: string[] = [];
   rows.forEach((row, ri) => {
     const cells = Array.from(row.children).filter((c) => c.tagName === 'TH' || c.tagName === 'TD');
-    const texts = cells.map((c) => (c.textContent ?? '').trim().replace(/\|/g, '\\|'));
+    const texts = cells.map((c) => inline(c).trim().replace(/\|/g, '\\|'));
     lines.push('| ' + texts.join(' | ') + ' |');
     if (ri === 0) lines.push('| ' + texts.map(() => '---').join(' | ') + ' |');
   });

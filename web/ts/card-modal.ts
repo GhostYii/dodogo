@@ -1,10 +1,11 @@
 // 卡片详情弹窗：标题/描述/侧栏字段/清单/评论/附件/活动/Git 关联
 
 import { api, errMsg } from './api';
-import { el, qs, qsa, esc, avatar, userLink, debounce, formField, selectBox, fmtDate, fmtDateTime, timeAgo, fmtSize, priorityText } from './util';
+import { el, qs, qsa, esc, avatar, userLink, formField, selectBox, fmtDate, fmtDateTime, timeAgo, fmtSize, priorityText } from './util';
 import { toast } from './toast';
 import { openModal, closeModal, confirmDialog, promptDialog } from './modal';
 import { mdToHtml } from './markdown';
+import { createWysiwygEditor, type WysiwygEditor } from './editor';
 import type { CardDetail, LabelDto, AssigneeDto, MemberDto, MilestoneDto, VersionDto, CommentDto, AttachmentDto, ActivityDto, GitCommitDto } from './types';
 
 let currentCardId: number | null = null;
@@ -15,6 +16,7 @@ let members: AssigneeDto[] = [];
 let milestones: MilestoneDto[] = [];
 let versions: VersionDto[] = [];
 let currentUserId = 0;
+let currentDescEditor: WysiwygEditor | null = null;
 
 export function getOpenCardId(): number | null {
   return currentCardId;
@@ -35,6 +37,8 @@ export async function openCardDetail(cardId: number): Promise<void> {
     body,
     width: '880px',
     onClose: () => {
+      currentDescEditor?.destroy();
+      currentDescEditor = null;
       currentCardId = null;
       detail = null;
     },
@@ -147,30 +151,33 @@ function buildDescription(d: CardDetail): HTMLElement {
 
   const editor = el('div', { class: 'cd-desc-editor', hidden: 'true' });
 
-  // 统一实时预览：透明 textarea 叠加在渲染结果之上（单一输入框，所见即所得地编辑 Markdown）
-  const mirror = el('div', { class: 'md-editor' });
-  const mirrorPreview = el('div', { class: 'markdown-body md-editor-preview' });
-  mirrorPreview.innerHTML = d.descriptionHtml || '';
-  const ta = el('textarea', { class: 'md-editor-input', placeholder: '支持 Markdown…' });
-  ta.value = d.description || '';
-  const renderPreview = debounce(async (md: string) => {
-    mirrorPreview.innerHTML = md.trim() ? await mdToHtml(md) : '';
-    mirrorPreview.scrollTop = ta.scrollTop;
-  }, 200);
-  ta.addEventListener('input', () => void renderPreview(ta.value));
-  ta.addEventListener('scroll', () => {
-    mirrorPreview.scrollTop = ta.scrollTop;
-  });
-  mirror.append(mirrorPreview, ta);
+  // 真正的 contenteditable 所见即所得编辑器（光标与排版像素级对齐）
+  currentDescEditor?.destroy();
+  const wys = createWysiwygEditor();
+  currentDescEditor = wys;
 
   const actions = el('div', { class: 'modal-actions' });
   const save = el('button', { class: 'btn btn-primary btn-sm', type: 'button', text: '保存' });
   const cancel = el('button', { class: 'btn btn-ghost btn-sm', type: 'button', text: '取消' });
 
+  let initialized = false;
+  let loading = false;
+
   function showEditor(): void {
     view.hidden = true;
     editor.hidden = false;
-    ta.focus();
+    if (!initialized) {
+      initialized = true;
+      loading = true;
+      void wys.setMarkdown(d.description)
+        .then(() => wys.focus())
+        .catch(() => wys.focus())
+        .finally(() => {
+          loading = false;
+        });
+    } else {
+      wys.focus();
+    }
   }
   function hideEditor(): void {
     view.hidden = false;
@@ -178,12 +185,13 @@ function buildDescription(d: CardDetail): HTMLElement {
   }
 
   save.addEventListener('click', async () => {
+    if (loading) return;
     save.disabled = true;
     try {
-      const v = ta.value;
+      const v = wys.getMarkdown();
       await patchCard({ description: v });
       d.description = v;
-      view.innerHTML = await mdToHtml(v);
+      view.innerHTML = v.trim() ? await mdToHtml(v) : '<p class="muted">暂无描述，点击编辑添加。</p>';
       hideEditor();
       toast('描述已保存', 'success');
     } catch (e) {
@@ -194,7 +202,7 @@ function buildDescription(d: CardDetail): HTMLElement {
   cancel.addEventListener('click', hideEditor);
 
   actions.append(save, cancel);
-  editor.append(mirror, actions);
+  editor.append(wys.root, actions);
   sec.append(view, editor);
   return sec;
 }
