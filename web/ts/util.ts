@@ -141,6 +141,20 @@ export function avatar(user: AvatarLike | null | undefined, size: 'xs' | 'sm' | 
   return el('span', { class: `avatar avatar-${size} avatar-initial`, text: initialsOf(name) });
 }
 
+/** 成员名称 + 头像的超链接（跳转到个人主页 /users/{id}）。 */
+export function userLink(user: AvatarLike | null | undefined, size: 'xs' | 'sm' | 'md' | 'lg' = 'sm'): HTMLElement {
+  const id = user?.id ?? user?.userId;
+  const display = (user?.displayName || user?.username || '?').trim();
+  const username = (user?.username || '').trim();
+  const a = el('a', { class: 'user-link', href: id != null ? `/users/${id}` : '#' });
+  a.append(avatar(user, size));
+  a.append(el('span', { text: display }));
+  if (username && username !== display) {
+    a.append(el('span', { class: 'muted', text: '@' + username }));
+  }
+  return a;
+}
+
 export function priorityText(p: string): string {
   switch (p) {
     case 'p0': return '紧急';

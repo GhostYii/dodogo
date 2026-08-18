@@ -1,7 +1,7 @@
 // 项目成员页：列表、添加成员、改角色、移除
 
 import { api, errMsg } from './api';
-import { el, qs, esc, avatar, fmtDate, formField } from './util';
+import { el, qs, esc, avatar, userLink, fmtDate, formField } from './util';
 import { toast } from './toast';
 import { openModal, closeModal, confirmDialog } from './modal';
 import type { MemberDto } from './types';
@@ -52,9 +52,7 @@ function render(listEl: HTMLElement, members: MemberDto[], reload: () => Promise
   for (const m of members) {
     const tr = el('tr');
     const nameTd = el('td', { class: 'cell-user' });
-    nameTd.append(avatar({ id: m.userId, avatarPath: m.avatarPath, displayName: m.displayName, username: m.username }, 'sm'));
-    nameTd.append(el('span', { class: 'cell-name', text: m.displayName || m.username }));
-    if (m.username && m.displayName !== m.username) nameTd.append(el('span', { class: 'muted', text: '@' + m.username }));
+    nameTd.append(userLink({ id: m.userId, avatarPath: m.avatarPath, displayName: m.displayName, username: m.username }, 'sm'));
     tr.append(nameTd);
 
     const roleTd = el('td');

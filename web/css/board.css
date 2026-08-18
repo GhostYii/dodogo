@@ -145,6 +145,7 @@
   overflow: hidden;
 }
 .card-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.card-assignee { display: inline-flex; text-decoration: none; }
 .card-labels { display: flex; flex-wrap: wrap; gap: 4px; overflow: hidden; }
 .card-meta-right { display: flex; align-items: center; gap: 6px; }
 .card-checklist { font-size: 12px; }

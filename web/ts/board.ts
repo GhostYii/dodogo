@@ -379,7 +379,9 @@ function buildCard(card: CardSummary): HTMLElement {
     right.append(el('span', { class: 'card-due' + (overdue ? ' overdue' : ''), text: fmtDate(card.dueDate) }));
   }
   if (card.assignee) {
-    right.append(avatar(card.assignee, 'sm'));
+    const assigneeLink = el('a', { class: 'card-assignee', href: `/users/${card.assignee.id}`, title: card.assignee.displayName || card.assignee.username });
+    assigneeLink.append(avatar(card.assignee, 'sm'));
+    right.append(assigneeLink);
   }
   meta.append(left, right);
 

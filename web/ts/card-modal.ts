@@ -1,7 +1,7 @@
 // 卡片详情弹窗：标题/描述/侧栏字段/清单/评论/附件/活动/Git 关联
 
 import { api, errMsg } from './api';
-import { el, qs, qsa, esc, avatar, debounce, formField, selectBox, fmtDate, fmtDateTime, timeAgo, fmtSize, priorityText } from './util';
+import { el, qs, qsa, esc, avatar, userLink, debounce, formField, selectBox, fmtDate, fmtDateTime, timeAgo, fmtSize, priorityText } from './util';
 import { toast } from './toast';
 import { openModal, closeModal, confirmDialog, promptDialog } from './modal';
 import { mdToHtml } from './markdown';
@@ -501,10 +501,9 @@ function buildComments(d: CardDetail): HTMLElement {
 
 function buildCommentRow(c: CommentDto): HTMLElement {
   const row = el('div', { class: 'comment' });
-  row.append(avatar({ id: c.userId, avatarPath: c.avatarPath, displayName: c.displayName, username: c.username }, 'sm'));
+  row.append(userLink({ id: c.userId, avatarPath: c.avatarPath, displayName: c.displayName, username: c.username }, 'sm'));
   const main = el('div', { class: 'comment-main' });
   const head = el('div', { class: 'comment-head' });
-  head.append(el('span', { class: 'comment-author', text: c.displayName || c.username }));
   head.append(el('span', { class: 'muted', text: timeAgo(c.createdAt) }));
   main.append(head);
   const content = el('div', { class: 'markdown-body' });
@@ -604,7 +603,10 @@ function buildActivity(d: CardDetail): HTMLElement {
     row.append(avatar({ id: a.userId ?? undefined, avatarPath: null, displayName: a.displayName, username: a.username }, 'xs'));
     const who = a.displayName || a.username || '系统';
     const verb = ACTION_LABELS[a.action] || a.action;
-    row.append(el('span', { class: 'activity-who', text: who }), el('span', { class: 'activity-detail', text: `${verb} ${a.detail || ''}`.trim() }));
+    const whoEl = a.userId != null
+      ? el('a', { class: 'activity-who user-link', href: `/users/${a.userId}`, text: who })
+      : el('span', { class: 'activity-who', text: who });
+    row.append(whoEl, el('span', { class: 'activity-detail', text: `${verb} ${a.detail || ''}`.trim() }));
     row.append(el('span', { class: 'muted', text: timeAgo(a.createdAt) }));
     list.append(row);
   }
